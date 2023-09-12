@@ -1,0 +1,261 @@
+PortB = MemoryMappedPeripheral(
+    base_address = 0x41004480;
+    structure = {
+        dir: u32;
+        dirclr: u32;
+        dirset: u32;
+        dirtgl: u32;
+        out: u32;
+        outclr: u32;
+        outset: u32;
+        outtgl: u32;
+        in: u32;
+        ctrl: BitField32 {
+            sampling: 32;
+        };
+        wrconfig: BitField32 {
+            pinmask: 16;
+            pmuxen: 1;
+            inen: 1;
+            pullen: 1;
+            $unused: 3;
+            drvstr: 1;
+            $unused: 1;
+            pmux: 4;
+            wrpmux: 1;
+            $unused: 1;
+            wrpincfg: 1;
+            hwsel: 1;
+        };
+    };
+);
+GCLK = MemoryMappedPeripheral(
+    base_address = 0x40000C00;
+    structure = {
+        ctrl: BitField8 {
+            swrst: 1;
+            $unused: 7;
+        };
+        status: BitField8 {
+            $unused: 7;
+            syncbusy: 1;
+        };
+        clkctrl: BitField16 {
+            id: BitEnum6 {
+                dfll48 = 0x0;
+                fdpll = 0x1;
+                fdpll32k = 0x2;
+                wdt = 0x3;
+                rtc = 0x4;
+                eic = 0x5;
+                usb = 0x6;
+                evsys_0 = 0x7;
+                evsys_1 = 0x8;
+                evsys_2 = 0x9;
+                evsys_3 = 0xa;
+                evsys_4 = 0xb;
+                evsys_5 = 0xc;
+                evsys_6 = 0xd;
+                evsys_7 = 0xe;
+                evsys_8 = 0xf;
+                evsys_9 = 0x10;
+                evsys_10 = 0x11;
+                evsys_11 = 0x12;
+                sercomx_slow = 0x13;
+                sercom0_core = 0x14;
+                sercom1_core = 0x15;
+                sercom2_core = 0x16;
+                sercom3_core = 0x17;
+                sercom4_core = 0x18;
+                sercom5_core = 0x19;
+                tcc0_tcc1 = 0x1a;
+                tcc2_tc3 = 0x1b;
+                tc4_tc5 = 0x1c;
+                tc6_tc7 = 0x1d;
+                adc = 0x1e;
+                ac_dig = 0x1f;
+                ac_ana = 0x20;
+                dac = 0x21;
+                i2s_0 = 0x23;
+                i2s_1 = 0x24;
+            };
+            $unused: 2;
+            gen: BitEnum4 {
+                gclk0 = 0x0;
+                gclk1 = 0x1;
+                gclk2 = 0x2;
+                gclk3 = 0x3;
+                gclk4 = 0x4;
+                gclk5 = 0x5;
+                gclk6 = 0x6;
+                gclk7 = 0x7;
+                gclk8 = 0x8;
+            };
+            $unused: 2;
+            clken: 1;
+            wrtlock: 1;
+        };
+        genctrl: BitField32 {
+            id: 4;
+            $unused: 4;
+            src: BitEnum5 {
+                xosc = 0x0;
+                gclkin = 0x1;
+                gclkgen1 = 0x2;
+                osculp32k = 0x3;
+                osc32k = 0x4;
+                xosc32k = 0x5;
+                osc8m = 0x6;
+                dfll48m = 0x7;
+                dpll96m = 0x8;
+            };
+            $unused: 3;
+            genen: 1;
+            idc: 1;
+            oov: 1;
+            oe: 1;
+            divsel: 1;
+            runstdby: 1;
+            $unused: 10;
+        };
+        gendiv: BitField32 {
+            id: 4;
+            $unused: 4;
+            div: 16;
+            $unused: 8;
+        };
+    };
+);
+
+RTCMode0 = MemoryMappedPeripheral(
+    base_address = 0x40001400;
+    interrupt_number = 3;
+    structure = {
+        ctrl: BitField16 {
+            swrst: 1;
+            enable: 1;
+            mode: BitEnum2 {
+                count32 = 0x0;
+                count16 = 0x1;
+                clock = 0x2;
+            };
+            $unused: 3;
+            matchclr: 1;
+            prescaler: BitEnum4 {
+                div1 = 0x0;
+                div2 = 0x1;
+                div4 = 0x2;
+                div8 = 0x3;
+                div16 = 0x4;
+                div32 = 0x5;
+                div64 = 0x6;
+                div128 = 0x7;
+                div256 = 0x8;
+                div512 = 0x9;
+                div1024 = 0xa;
+            };
+            $unused: 3;
+        };
+        readreq: BitField16 {
+            addr: 6;
+            $unused: 8;
+            rcont: 1;
+            rreq: 1;
+        };
+        evctrl: BitField16 {
+            pereo0: 1;
+            pereo1: 1;
+            pereo2: 1;
+            pereo3: 1;
+            pereo4: 1;
+            pereo5: 1;
+            pereo6: 1;
+            pereo7: 1;
+            compeo0: 1;
+            $unused: 6;
+            ovfeo: 1;
+        };
+        intenclr: BitField8 {
+            comp0: 1;
+            $unused: 5;
+            syncrdy: 1;
+            ovf: 1;
+        };
+        intenset: BitField8 {
+            comp0: 1;
+            $unused: 5;
+            syncrdy: 1;
+            ovf: 1;
+        };
+        intflag: BitField8 {
+            comp0: 1;
+            $unused: 5;
+            syncrdy: 1;
+            ovf: 1;
+        };
+        $unused: u8;
+        status: BitField8 {
+            $unused: 7;
+            syncbusy: 1;
+        };
+        dbgctrl: BitField8 {
+            dbgrun: 1;
+            $unused: 7;
+        };
+        freqcorr: BitField8 {
+            value: 7;
+            sign: 1;
+        };
+        $unused: u16;
+        $unused: u8;
+        count: u32;
+        $unused: u32;
+        comp0: u32;
+    };
+);
+
+PortB.initialize = {
+    dir = {
+        portb.outtgl = 1 << 30;
+    };
+};
+
+GCLK.initialize = {
+    gendiv = {
+        id = 4;
+        div = 0;
+    };
+    genctrl = {
+        id = 4;
+        src = osculp32k;
+        genen = 1;
+    };
+    clkctrl = {
+        id = rtc;
+        gen = gclk4;
+        clken = 1;
+    };
+};
+
+RTCMode0.initialize = {
+    count = 0;
+    comp0 = 0x8000;
+    intenset = {
+        comp0 = 1;
+    };
+    ctrl = {
+        enable = 1;
+        mode = count32;
+        matchclr = 1;
+    };
+};
+
+# auto enables interrupt in NVIC
+RTCMode0.on_interrupt = fun (rtc: RTCMode0, portb: PortB) {
+    portb.outtgl = 1 << 30;
+    rtc.intflag = {
+        comp0 = 1;
+    };
+    # auto clears interrupt in NVIC
+};
+
