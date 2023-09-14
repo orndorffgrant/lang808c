@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "lexer.h"
@@ -25,6 +26,8 @@ char *token_type_to_static_string(TokenType token_type) {
         case t_dot: return "dot";
         case t_comma: return "comma";
         case t_shiftleft: return "shiftleft";
+        case t_fun: return "fun";
+        case t_unused: return "unused";
         case t_id: return "id";
         case t_inthexliteral: return "inthexliteral";
         case t_intdecliteral: return "intdecliteral";
@@ -122,8 +125,12 @@ TokenType token_type(StringRef str, char *lookahead) {
         return t_dot;
     } else if (strncmp(str.str, ",", str.len) == 0) {
         return t_comma;
-    } else if (strncmp(str.str, "<<", str.len) == 0) {
+    } else if (str.len == 2 && strncmp(str.str, "<<", str.len) == 0) {
         return t_shiftleft;
+    } else if (str.len == 3 && strncmp(str.str, "fun", str.len) == 0) {
+        return t_fun;
+    } else if (str.len == 7 && strncmp(str.str, "$unused", str.len) == 0) {
+        return t_unused;
     } else if (is_id(str, lookahead)) {
         return t_id;
     } else if (is_inthexliteral(str, lookahead)) {
@@ -152,6 +159,12 @@ void lex(char *source, int source_len, Lexeme *lexemes) {
             i_lexed_so_far = i;
         } else if (curr_tok != t_NONE) {
             lexemes[lexeme_num] = (Lexeme){curr_tok, curr_str};
+            if (curr_tok == t_intdecliteral) {
+                char buf[256];
+                memset(buf, 0, 256);
+                strncpy(buf, curr_str.str, curr_str.len);
+                lexemes[lexeme_num].intliteral_value = strtol(buf, NULL, 0);
+            }
             lexeme_num += 1;
             i_lexed_so_far = i;
         }

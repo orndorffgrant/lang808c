@@ -7,8 +7,8 @@
 
 #include "common.h"
 
-#define VALID_ID_CHARS_START "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$"
-#define VALID_ID_CHARS_START_LEN 54
+#define VALID_ID_CHARS_START "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+#define VALID_ID_CHARS_START_LEN 53
 #define VALID_ID_CHARS "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
 #define VALID_ID_CHARS_LEN 63
 #define DELIM_CHARS "\0\n =(){}:;.,"
@@ -27,6 +27,8 @@ typedef enum {
     t_dot,
     t_comma,
     t_shiftleft,
+    t_fun,
+    t_unused,
     t_id,
     t_inthexliteral,
     t_intdecliteral
@@ -35,6 +37,7 @@ typedef enum {
 typedef struct _Lexeme {
     TokenType t;
     StringRef s;
+    long intliteral_value;
 } Lexeme;
 
 TokenType token_type(StringRef str, char *lookahead);

@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; lexemes[i].t != t_NONE; i++) {
         strncpy(buf, lexemes[i].s.str, lexemes[i].s.len);
         buf[lexemes[i].s.len] = 0;
-        printf("%s(%s) ", token_type_to_static_string(lexemes[i].t), buf);
+        printf("%s(%s, %lu) ", token_type_to_static_string(lexemes[i].t), buf, lexemes[i].intliteral_value);
     }
     printf("\n");
 }
