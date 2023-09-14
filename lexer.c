@@ -159,7 +159,7 @@ void lex(char *source, int source_len, Lexeme *lexemes) {
             i_lexed_so_far = i;
         } else if (curr_tok != t_NONE) {
             lexemes[lexeme_num] = (Lexeme){curr_tok, curr_str};
-            if (curr_tok == t_intdecliteral) {
+            if (curr_tok == t_intdecliteral || curr_tok == t_inthexliteral) {
                 char buf[256];
                 memset(buf, 0, 256);
                 strncpy(buf, curr_str.str, curr_str.len);
