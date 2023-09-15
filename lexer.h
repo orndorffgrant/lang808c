@@ -17,6 +17,7 @@
 typedef enum {
     t_NONE = 0,
     t_IGNORE,
+    // punctuation
     t_equals,
     t_leftparen,
     t_rightparen,
@@ -27,8 +28,22 @@ typedef enum {
     t_dot,
     t_comma,
     t_shiftleft,
-    t_fun,
+
+    // keywords
+    t_mmp,
+    t_base_address,
+    t_interrupt_number,
+    t_structure,
     t_unused,
+    t_initialize,
+    t_on_interrupt,
+    t_fun,
+
+    // int types
+    t_inttype, // u8, u16, etc.
+    t_bf, // BitField8, etc.
+
+    // ids and literals
     t_id,
     t_inthexliteral,
     t_intdecliteral
@@ -37,11 +52,11 @@ typedef enum {
 typedef struct _Token {
     TokenType type;
     StringRef lexeme;
-    long intliteral_value;
+    long int_value;
 } Token;
 
 TokenType token_type(StringRef str, char *lookahead);
-void lex(char *source, int source_len, Token *tokens);
+int lex(char *source, int source_len, Token *tokens);
 char *token_type_to_static_string(TokenType token_type);
 
 #endif

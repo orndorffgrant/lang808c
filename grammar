@@ -1,6 +1,8 @@
-name -> name.id | id
+stmt -> name = expr ;
+stmt -> if ( expr ) { stmt } ;
+stmt -> while ( expr ) { stmt } ;
 
-stmt -> name = expr;
+name -> id.name | id
 
 call -> id(optparams)
 optparams -> params | e
