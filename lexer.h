@@ -34,14 +34,14 @@ typedef enum {
     t_intdecliteral
 } TokenType;
 
-typedef struct _Lexeme {
-    TokenType t;
-    StringRef s;
+typedef struct _Token {
+    TokenType type;
+    StringRef lexeme;
     long intliteral_value;
-} Lexeme;
+} Token;
 
 TokenType token_type(StringRef str, char *lookahead);
-void lex(char *source, int source_len, Lexeme *lexemes);
+void lex(char *source, int source_len, Token *tokens);
 char *token_type_to_static_string(TokenType token_type);
 
 #endif

@@ -1,0 +1,7 @@
+name -> name.id | id
+
+stmt -> name = expr;
+
+call -> id(optparams)
+optparams -> params | e
+params -> params, param | param

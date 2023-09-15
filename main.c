@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "symbols.h"
 #include "lexer.h"
 
 #define MAX_SOURCE_LEN 65536
@@ -38,16 +39,18 @@ int main(int argc, char *argv[]) {
         source[i] = getc(source_file);
     }
 
-    Lexeme lexemes[MAX_SOURCE_LEN];
-    memset(lexemes, 0, MAX_SOURCE_LEN * sizeof(Lexeme));
+    SymbolTable symbols;
+    memset(&symbols, 0, sizeof(symbols));
+    Token tokens[MAX_SOURCE_LEN];
+    memset(tokens, 0, sizeof(tokens));
 
-    lex(source, source_len, lexemes);
+    lex(source, source_len, tokens);
 
     char buf[256];
-    for (int i = 0; lexemes[i].t != t_NONE; i++) {
-        strncpy(buf, lexemes[i].s.str, lexemes[i].s.len);
-        buf[lexemes[i].s.len] = 0;
-        printf("%s(%s, %lu) ", token_type_to_static_string(lexemes[i].t), buf, lexemes[i].intliteral_value);
+    for (int i = 0; tokens[i].type != t_NONE; i++) {
+        strncpy(buf, tokens[i].lexeme.str, tokens[i].lexeme.len);
+        buf[tokens[i].lexeme.len] = 0;
+        printf("%s(%s, %lu) ", token_type_to_static_string(tokens[i].type), buf, tokens[i].intliteral_value);
     }
     printf("\n");
 }

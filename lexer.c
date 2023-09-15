@@ -145,8 +145,8 @@ TokenType token_type(StringRef str, char *lookahead) {
     return t_NONE;
 }
 
-void lex(char *source, int source_len, Lexeme *lexemes) {
-    int lexeme_num = 0;
+void lex(char *source, int source_len, Token *tokens) {
+    int token_num = 0;
 
     StringRef curr_str = {source, 0};
     TokenType curr_tok = t_NONE;
@@ -158,14 +158,15 @@ void lex(char *source, int source_len, Lexeme *lexemes) {
         if (curr_tok == t_IGNORE) {
             i_lexed_so_far = i;
         } else if (curr_tok != t_NONE) {
-            lexemes[lexeme_num] = (Lexeme){curr_tok, curr_str};
+            tokens[token_num] = (Token){curr_tok, curr_str};
             if (curr_tok == t_intdecliteral || curr_tok == t_inthexliteral) {
                 char buf[256];
                 memset(buf, 0, 256);
+                // yes this is an overflow risk
                 strncpy(buf, curr_str.str, curr_str.len);
-                lexemes[lexeme_num].intliteral_value = strtol(buf, NULL, 0);
+                tokens[token_num].intliteral_value = strtol(buf, NULL, 0);
             }
-            lexeme_num += 1;
+            token_num += 1;
             i_lexed_so_far = i;
         }
     }
