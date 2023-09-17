@@ -26,19 +26,20 @@ char *token_type_to_static_string(TokenType token_type) {
         case t_semicolon: return "semicolon";
         case t_dot: return "dot";
         case t_comma: return "comma";
+        case t_at: return "at";
+        case t_bang: return "bang";
+
         case t_shiftleft: return "shiftleft";
 
         case t_mmp: return "mmp";
-        case t_base_address: return "base_address";
-        case t_interrupt_number: return "interrupt_number";
-        case t_structure: return "structure";
         case t_unused: return "unused";
         case t_initialize: return "initialize";
         case t_on_interrupt: return "on_interrupt";
-        case t_inttype: return "inttype";
-
-        case t_bf: return "bf";
         case t_fun: return "fun";
+
+        case t_inttype: return "inttype";
+        case t_bf: return "bf";
+        case t_be: return "be";
 
         case t_id: return "id";
         case t_inthexliteral: return "inthexliteral";
@@ -66,6 +67,21 @@ bool is_comment(StringRef str) {
     return false;
 }
 
+bool is_be(StringRef str, char *lookahead) {
+    if (!char_is_in(lookahead[0], DELIM_CHARS, DELIM_CHARS_LEN)) {
+        return false;
+    }
+    if (str.len < 7 || strncmp(str.str, "BitEnum", 7) != 0) {
+        return false;
+    }
+    for (int i = 7; i < str.len; i++) {
+        char c = str.str[i];
+        if (!char_is_in(str.str[i], "1234567890", 10)) {
+            return false;
+        }
+    }
+    return true;
+}
 bool is_bf(StringRef str, char *lookahead) {
     if (!char_is_in(lookahead[0], DELIM_CHARS, DELIM_CHARS_LEN)) {
         return false;
@@ -85,9 +101,9 @@ bool is_bf(StringRef str, char *lookahead) {
 bool is_inttype(StringRef str, char *lookahead) {
     if (str.len == 2 && strncmp(str.str, "u8", str.len) == 0) {
         return true;
-    } else if (str.len == 2 && strncmp(str.str, "u16", str.len) == 0) {
+    } else if (str.len == 3 && strncmp(str.str, "u16", str.len) == 0) {
         return true;
-    } else if (str.len == 2 && strncmp(str.str, "u32", str.len) == 0) {
+    } else if (str.len == 3 && strncmp(str.str, "u32", str.len) == 0) {
         return true;
     } else {
         return false;
@@ -166,16 +182,14 @@ TokenType token_type(StringRef str, char *lookahead) {
         return t_dot;
     } else if (strncmp(str.str, ",", str.len) == 0) {
         return t_comma;
+    } else if (strncmp(str.str, "@", str.len) == 0) {
+        return t_at;
+    } else if (strncmp(str.str, "!", str.len) == 0) {
+        return t_bang;
     } else if (str.len == 2 && strncmp(str.str, "<<", str.len) == 0) {
         return t_shiftleft;
     } else if (str.len == 22 && strncmp(str.str, "MemoryMappedPeripheral", str.len) == 0) {
         return t_mmp;
-    } else if (str.len == 12 && strncmp(str.str, "base_address", str.len) == 0) {
-        return t_base_address;
-    } else if (str.len == 16 && strncmp(str.str, "interrupt_number", str.len) == 0) {
-        return t_interrupt_number;
-    } else if (str.len == 9 && strncmp(str.str, "structure", str.len) == 0) {
-        return t_structure;
     } else if (str.len == 7 && strncmp(str.str, "$unused", str.len) == 0) {
         return t_unused;
     } else if (str.len == 10 && strncmp(str.str, "initialize", str.len) == 0) {
@@ -188,6 +202,8 @@ TokenType token_type(StringRef str, char *lookahead) {
         return t_inttype;
     } else if (is_bf(str, lookahead)) {
         return t_bf;
+    } else if (is_be(str, lookahead)) {
+        return t_be;
     } else if (is_id(str, lookahead)) {
         return t_id;
     } else if (is_inthexliteral(str, lookahead)) {

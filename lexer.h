@@ -27,13 +27,14 @@ typedef enum {
     t_semicolon,
     t_dot,
     t_comma,
+    t_at,
+    t_bang,
+
+    // operators
     t_shiftleft,
 
     // keywords
     t_mmp,
-    t_base_address,
-    t_interrupt_number,
-    t_structure,
     t_unused,
     t_initialize,
     t_on_interrupt,
@@ -42,6 +43,7 @@ typedef enum {
     // int types
     t_inttype, // u8, u16, etc.
     t_bf, // BitField8, etc.
+    t_be, // BitEnum6, etc.
 
     // ids and literals
     t_id,
