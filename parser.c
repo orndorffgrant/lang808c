@@ -11,8 +11,55 @@ int match(TokenType token_type, Token *tokens, int next_token) {
             token_type_to_static_string(tokens[next_token].type)
         );
     }
-    PARSE_TREE_PRINT("%s", token_type_to_static_string(token_type));
+    PARSE_TREE_PRINT_TOKEN_TYPE(token_type);
     return next_token + 1;
+}
+
+int expression(Token *tokens, int next_token, char *parse_tree_print_padding) {
+    PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("Expression:\n");
+    PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("  ");
+    // TODO
+    PARSE_TREE_PRINT("\n");
+
+    return next_token;
+}
+
+int bitfield_value(Token *tokens, int next_token, char *parse_tree_print_padding) {
+    PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("BitFieldValue:\n");
+    PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("  ");
+    next_token = match(t_leftbrace, tokens, next_token);
+    PARSE_TREE_PRINT("\n");
+
+    while (tokens[next_token].type != t_rightbrace) {
+        PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("  BitFieldValueItem:\n");
+        PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("    ");
+        // TODO actually process
+        next_token = match(t_id, tokens, next_token);
+        PARSE_TREE_PRINT("\n");
+        PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("    ");
+        next_token = match(t_equals, tokens, next_token);
+        PARSE_TREE_PRINT("\n");
+        if (tokens[next_token].type == t_intdecliteral) {
+            PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("    ");
+            // TODO actually process
+            next_token = match(t_intdecliteral, tokens, next_token);
+            PARSE_TREE_PRINT("\n");
+        } else {
+            PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("    ");
+            // TODO actually process
+            next_token = match(t_id, tokens, next_token);
+            PARSE_TREE_PRINT("\n");
+        }
+        PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("    ");
+        next_token = match(t_semicolon, tokens, next_token);
+        PARSE_TREE_PRINT("\n");
+    }
+
+    PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("  ");
+    next_token = match(t_rightbrace, tokens, next_token);
+    PARSE_TREE_PRINT("\n");
+
+    return next_token;
 }
 
 int statement_mmp_def_structure_item_bf_item_enum_item(Token *tokens, int next_token) {
@@ -186,11 +233,57 @@ int statement_mmp_def(Token *tokens, int next_token) {
     next_token = statement_mmp_def_structure(tokens, next_token);
     return next_token;
 }
+int statement_initialize_statement(Token *tokens, int next_token) {
+    PARSE_TREE_PRINT("    InitializeStatement:\n");
+    PARSE_TREE_PRINT("      ");
+    // TODO actually process
+    next_token = match(t_id, tokens, next_token);
+    PARSE_TREE_PRINT("\n");
+    PARSE_TREE_PRINT("      ");
+    next_token = match(t_equals, tokens, next_token);
+    PARSE_TREE_PRINT("\n");
+
+    if (tokens[next_token].type == t_leftbrace) {
+        next_token = bitfield_value(tokens, next_token, "      ");
+    } else {
+        PARSE_TREE_PRINT("      ");
+        // TODO actually process
+        next_token = match(t_inthexliteral, tokens, next_token);
+        PARSE_TREE_PRINT("\n");
+    }
+    PARSE_TREE_PRINT("      ");
+    next_token = match(t_semicolon, tokens, next_token);
+    PARSE_TREE_PRINT("\n");
+    return next_token;
+}
+int statement_initialize(Token *tokens, int next_token) {
+    PARSE_TREE_PRINT("  Initialize:\n");
+    PARSE_TREE_PRINT("    ");
+    next_token = match(t_initialize, tokens, next_token);
+    PARSE_TREE_PRINT("\n");
+    // TODO actually process
+    PARSE_TREE_PRINT("    ");
+    next_token = match(t_id, tokens, next_token);
+    PARSE_TREE_PRINT("\n");
+    PARSE_TREE_PRINT("    ");
+    next_token = match(t_leftbrace, tokens, next_token);
+    PARSE_TREE_PRINT("\n");
+    while (tokens[next_token].type != t_rightbrace) {
+        // any number of intialization statements
+        next_token = statement_initialize_statement(tokens, next_token);
+    }
+    PARSE_TREE_PRINT("    ");
+    next_token = match(t_rightbrace, tokens, next_token);
+    PARSE_TREE_PRINT("\n");
+    return next_token;
+}
 int statement(Token *tokens, int next_token) {
     PARSE_TREE_PRINT("RootStatement:\n");
     switch (tokens[next_token].type) {
         case t_mmp:
             return statement_mmp_def(tokens, next_token);
+        case t_initialize:
+            return statement_initialize(tokens, next_token);
         default:
             PANIC("invalid token at beginning of statement");
     }

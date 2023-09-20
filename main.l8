@@ -205,10 +205,8 @@ MemoryMappedPeripheral RTCMode0 @0x40000C00 !3 {
 }
 
 initialize PortB {
-    dir = {
-        portb.outtgl = 1 << 30;
-    };
-};
+    dir = 0x20000000; # 1 << 30
+}
 
 initialize GCLK {
     gendiv = {
@@ -225,10 +223,10 @@ initialize GCLK {
         gen = gclk4;
         clken = 1;
     };
-};
+}
 
 initialize RTCMode0 {
-    count = 0;
+    count = 0x0;
     comp0 = 0x8000;
     intenset = {
         comp0 = 1;
@@ -238,7 +236,7 @@ initialize RTCMode0 {
         mode = count32;
         matchclr = 1;
     };
-};
+}
 
 # auto enables interrupt in NVIC
 on_interrupt RTCMode0 {
@@ -247,5 +245,5 @@ on_interrupt RTCMode0 {
         comp0 = 1;
     };
     # auto clears interrupt in NVIC
-};
+}
 
