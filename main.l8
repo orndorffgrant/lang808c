@@ -1,3 +1,4 @@
+lexer demonstrate gibberish totally invalid token gets an error
 MemoryMappedPeripheral PortB @0x41004480 {
     dir: u32;
     dirclr: u32;
@@ -26,6 +27,7 @@ MemoryMappedPeripheral PortB @0x41004480 {
         hwsel: 1;
     };
 }
+
 MemoryMappedPeripheral GCLK @0x40000C00 {
     ctrl: BitField8 {
         swrst: 1;
@@ -238,12 +240,61 @@ initialize RTCMode0 {
     };
 }
 
-# auto enables interrupt in NVIC
+# This function just loops for a while to take up some time
+fun delay(delay_count: u32) {
+    for (u32 i = 0; i < delay_count; i = (i + 1)) {}
+}
+
+fun toggleLED() {
+    PortB.outtgl = (1 << 30);
+    delay(1000);
+    PortB.outtgl = (1 << 30);
+}
+
+static u32 counting_up = 1;
+
+fun blink_and_update_blink_times(blink_times): u32 {
+    u32 new_blink_times = 0;
+
+    for (u32 i = 0; i < blink_times; i = (i + 1)) {
+        blinkLED();
+        delay(1000);
+    }
+
+    if (blink_times == 1) {
+        counting_up = 1;
+    }
+    if (blink_times == 4) {
+        counting_up = 0;
+    }
+    if (counting_up) {
+        new_blink_times = blink_times + 1;
+    } else {
+        new_blink_times = blink_times - 1;
+    }
+
+    return new_blink_times;
+}
+
+static u32 blink_times = 1;
+
+# This is a comment
+# on_interrupt keyword auto-enables interrupt in NVIC
 on_interrupt RTCMode0 {
-    PortB.outtgl = 1 << 30;
+
+    if ((PortB.in & (1 << 30)) == 0) {
+        # if button is not pressed, reset state
+        blink_times = 1;
+    } else {
+        # if button is pressed, blink the LED and update
+        # how many times we should update the LED for next interrupt
+        blink_times = blink_and_update_blink_times(blink_times);
+    }
+
+    # This clears the RTC peripheral interrupt flag
     RTCMode0.intflag = {
         comp0 = 1;
     };
-    # auto clears interrupt in NVIC
-}
+    # end of on_interrupt auto-clears interrupt in NVIC
+};
 
