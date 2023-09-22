@@ -47,6 +47,10 @@ typedef enum {
     t_initialize,
     t_on_interrupt,
     t_fun,
+    t_for,
+    t_if,
+    t_else,
+    t_return,
 
     // int types
     t_inttype, // u8, u16, etc.

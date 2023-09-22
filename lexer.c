@@ -44,6 +44,10 @@ char *token_type_to_static_string(TokenType token_type) {
         case t_initialize: return "initialize";
         case t_on_interrupt: return "on_interrupt";
         case t_fun: return "fun";
+        case t_for: return "for";
+        case t_if: return "if";
+        case t_else: return "else";
+        case t_return: return "return";
 
         case t_inttype: return "inttype";
         case t_bf: return "bf";
@@ -235,6 +239,14 @@ TokenType token_type(StringRef str, char *lookahead) {
         return t_on_interrupt;
     } else if (str.len == 3 && strncmp(str.str, "fun", str.len) == 0) {
         return t_fun;
+    } else if (str.len == 3 && strncmp(str.str, "for", str.len) == 0) {
+        return t_for;
+    } else if (str.len == 2 && strncmp(str.str, "if", str.len) == 0) {
+        return t_if;
+    } else if (str.len == 4 && strncmp(str.str, "else", str.len) == 0) {
+        return t_else;
+    } else if (str.len == 4 && strncmp(str.str, "return", str.len) == 0) {
+        return t_return;
     } else if (is_inttype(str, lookahead)) {
         return t_inttype;
     } else if (is_bf(str, lookahead)) {
@@ -313,7 +325,7 @@ void print_tokens(Token *tokens, int token_num) {
     for (int i = 0; i < token_num; i++) {
         strncpy(buf, tokens[i].lexeme.str, tokens[i].lexeme.len);
         buf[tokens[i].lexeme.len] = 0;
-        printf("%s(%s, %lu) ", token_type_to_static_string(tokens[i].type), buf, tokens[i].int_value);
+        printf("%s(%s,%lu)\t", token_type_to_static_string(tokens[i].type), buf, tokens[i].int_value);
     }
     printf("\n");
 }
