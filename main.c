@@ -3,9 +3,7 @@
 #include <string.h>
 
 #include "common.h"
-#include "symbols.h"
 #include "lexer.h"
-#include "parser.h"
 
 #define MAX_SOURCE_LEN 65536
 
@@ -40,14 +38,10 @@ int main(int argc, char *argv[]) {
         source[i] = getc(source_file);
     }
 
-    SymbolTable symbols;
-    memset(&symbols, 0, sizeof(symbols));
     Token tokens[MAX_SOURCE_LEN];
     memset(tokens, 0, sizeof(tokens));
 
     int token_num = lex(source, source_len, tokens);
 
     print_tokens(tokens, token_num);
-
-    //parse(tokens, token_num);
 }
