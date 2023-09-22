@@ -17,6 +17,8 @@
 typedef enum {
     t_NONE = 0,
     t_IGNORE,
+    t_INVALID,
+
     // punctuation
     t_equals,
     t_leftparen,
@@ -32,6 +34,12 @@ typedef enum {
 
     // operators
     t_shiftleft,
+    t_equalsequals,
+    t_lessthan,
+    t_greaterthan,
+    t_plus,
+    t_minus,
+    t_and,
 
     // keywords
     t_mmp,
@@ -47,8 +55,7 @@ typedef enum {
 
     // ids and literals
     t_id,
-    t_inthexliteral,
-    t_intdecliteral
+    t_intliteral,
 } TokenType;
 
 typedef struct _Token {
@@ -59,6 +66,7 @@ typedef struct _Token {
 
 TokenType token_type(StringRef str, char *lookahead);
 int lex(char *source, int source_len, Token *tokens);
+void print_tokens(Token *tokens, int token_num);
 char *token_type_to_static_string(TokenType token_type);
 
 #endif

@@ -1,0 +1,18 @@
+MemoryMappedPeripheral PortB @0x41004480 {
+  dir: u32;
+  outtgl: u32;
+  config: BitField8 {
+    pmuxen: 1;
+    inen: 1;
+    pullen: 1;
+    $unused: 3;
+    drvstr: 1;
+    $unused: 1;
+  };
+}
+initialize PortB {
+  dir = 0x20000000;
+  config = {
+    pullen = 1;
+  };
+}

@@ -17,6 +17,8 @@ char *token_type_to_static_string(TokenType token_type) {
     switch (token_type) {
         case t_NONE: return "NONE";
         case t_IGNORE: return "IGNORE";
+        case t_INVALID: return "INVALID";
+
         case t_equals: return "equals";
         case t_leftparen: return "leftparen";
         case t_rightparen: return "rightparen";
@@ -30,6 +32,12 @@ char *token_type_to_static_string(TokenType token_type) {
         case t_bang: return "bang";
 
         case t_shiftleft: return "shiftleft";
+        case t_equalsequals: return "equalsequals";
+        case t_lessthan: return "lessthan";
+        case t_greaterthan: return "greaterthan";
+        case t_plus: return "plus";
+        case t_minus: return "minus";
+        case t_and: return "and";
 
         case t_mmp: return "mmp";
         case t_unused: return "unused";
@@ -42,8 +50,7 @@ char *token_type_to_static_string(TokenType token_type) {
         case t_be: return "be";
 
         case t_id: return "id";
-        case t_inthexliteral: return "inthexliteral";
-        case t_intdecliteral: return "intdecliteral";
+        case t_intliteral: return "intliteral";
         default: return "ERROR_INVALID_TOKEN_TYPE";
     }
 }
@@ -146,7 +153,6 @@ bool is_inthexliteral(StringRef str, char *lookahead) {
     }
     return true;
 }
-
 bool is_intdecliteral(StringRef str, char *lookahead) {
     if (!char_is_in(lookahead[0], DELIM_CHARS, DELIM_CHARS_LEN)) {
         return false;
@@ -160,34 +166,65 @@ bool is_intdecliteral(StringRef str, char *lookahead) {
     }
     return true;
 }
+bool is_intliteral(StringRef str, char *lookahead) {
+    return is_intdecliteral(str, lookahead) || is_inthexliteral(str, lookahead);
+}
+
+bool is_invalid(StringRef str, char *lookahead) {
+    if (!char_is_in(lookahead[0], DELIM_CHARS, DELIM_CHARS_LEN)) {
+        return false;
+    }
+    if (str.str[0] == '#') {
+        return false;
+    }
+    return true;
+}
 
 TokenType token_type(StringRef str, char *lookahead) {
     if (DEBUG_LOG) print_StringRef(str);
     LOG(" evaluating token: ");
-    if (strncmp(str.str, "=", str.len) == 0) {
-        return t_equals;
-    } else if (strncmp(str.str, "(", str.len) == 0) {
+    if (str.str[0] == '(' && str.len == 1) {
         return t_leftparen;
-    } else if (strncmp(str.str, ")", str.len) == 0) {
+    } else if (str.str[0] == ')' && str.len == 1) {
         return t_rightparen;
-    } else if (strncmp(str.str, "{", str.len) == 0) {
+    } else if (str.str[0] == '{' && str.len == 1) {
         return t_leftbrace;
-    } else if (strncmp(str.str, "}", str.len) == 0) {
+    } else if (str.str[0] == '}' && str.len == 1) {
         return t_rightbrace;
-    } else if (strncmp(str.str, ":", str.len) == 0) {
+    } else if (str.str[0] == ':' && str.len == 1) {
         return t_colon;
-    } else if (strncmp(str.str, ";", str.len) == 0) {
+    } else if (str.str[0] == ';' && str.len == 1) {
         return t_semicolon;
-    } else if (strncmp(str.str, ".", str.len) == 0) {
+    } else if (str.str[0] == '.' && str.len == 1) {
         return t_dot;
-    } else if (strncmp(str.str, ",", str.len) == 0) {
+    } else if (str.str[0] == ',' && str.len == 1) {
         return t_comma;
-    } else if (strncmp(str.str, "@", str.len) == 0) {
+    } else if (str.str[0] == '@' && str.len == 1) {
         return t_at;
-    } else if (strncmp(str.str, "!", str.len) == 0) {
+    } else if (str.str[0] == '!' && str.len == 1) {
         return t_bang;
     } else if (str.len == 2 && strncmp(str.str, "<<", str.len) == 0) {
         return t_shiftleft;
+    } else if (str.str[0] == '<' && str.len == 1) {
+        if (lookahead[0] == '<') {
+            return t_NONE;
+        }
+        return t_lessthan;
+    } else if (str.str[0] == '>' && str.len == 1) {
+        return t_greaterthan;
+    } else if (str.str[0] == '+' && str.len == 1) {
+        return t_plus;
+    } else if (str.str[0] == '-' && str.len == 1) {
+        return t_minus;
+    } else if (str.str[0] == '&' && str.len == 1) {
+        return t_and;
+    } else if (str.len == 2 && strncmp(str.str, "==", str.len) == 0) {
+        return t_equalsequals;
+    } else if (str.str[0] == '=' && str.len == 1) {
+        if (lookahead[0] == '=') {
+            return t_NONE;
+        }
+        return t_equals;
     } else if (str.len == 22 && strncmp(str.str, "MemoryMappedPeripheral", str.len) == 0) {
         return t_mmp;
     } else if (str.len == 7 && strncmp(str.str, "$unused", str.len) == 0) {
@@ -204,24 +241,24 @@ TokenType token_type(StringRef str, char *lookahead) {
         return t_bf;
     } else if (is_be(str, lookahead)) {
         return t_be;
-    } else if (is_id(str, lookahead)) {
-        return t_id;
-    } else if (is_inthexliteral(str, lookahead)) {
-        return t_inthexliteral;
-    } else if (is_intdecliteral(str, lookahead)) {
-        return t_intdecliteral;
+    } else if (is_intliteral(str, lookahead)) {
+        return t_intliteral;
     } else if (str.len == 1 && char_is_in(str.str[0], " \n", 2)) {
         // ignore whitespace
         return t_IGNORE;
     } else if (is_comment(str)) {
         // ignore lines starting with #
         return t_IGNORE;
+    } else if (is_id(str, lookahead)) {
+        return t_id;
+    } else if (is_invalid(str, lookahead)) {
+        return t_INVALID;
     }
     return t_NONE;
 }
 
 int int_value_for_token(Token token) {
-    if (token.type == t_intdecliteral || token.type == t_inthexliteral) {
+    if (token.type == t_intliteral) {
         char buf[256];
         memset(buf, 0, 256);
         // yes this is an overflow risk
@@ -242,7 +279,6 @@ int int_value_for_token(Token token) {
     } else {
         return 0;
     }
-
 }
 
 int lex(char *source, int source_len, Token *tokens) {
@@ -255,7 +291,12 @@ int lex(char *source, int source_len, Token *tokens) {
         curr_str = (StringRef){source + i_lexed_so_far, i - i_lexed_so_far};
         curr_tok = token_type(curr_str, source + i);
         LOG("got %s\n", token_type_to_static_string(curr_tok));
-        if (curr_tok == t_IGNORE) {
+        if (curr_tok == t_INVALID) {
+            char buf[256];
+            strncpy(buf, curr_str.str, curr_str.len);
+            buf[curr_str.len] = 0;
+            PANIC("Found invalid token: %s\n", buf);
+        } else if (curr_tok == t_IGNORE) {
             i_lexed_so_far = i;
         } else if (curr_tok != t_NONE) {
             tokens[token_num] = (Token){curr_tok, curr_str};
@@ -265,4 +306,14 @@ int lex(char *source, int source_len, Token *tokens) {
         }
     }
     return token_num;
+}
+
+void print_tokens(Token *tokens, int token_num) {
+    char buf[256];
+    for (int i = 0; i < token_num; i++) {
+        strncpy(buf, tokens[i].lexeme.str, tokens[i].lexeme.len);
+        buf[tokens[i].lexeme.len] = 0;
+        printf("%s(%s, %lu) ", token_type_to_static_string(tokens[i].type), buf, tokens[i].int_value);
+    }
+    printf("\n");
 }

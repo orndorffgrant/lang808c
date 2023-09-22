@@ -39,10 +39,10 @@ int bitfield_value(Token *tokens, int next_token, char *parse_tree_print_padding
         PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("    ");
         next_token = match(t_equals, tokens, next_token);
         PARSE_TREE_PRINT("\n");
-        if (tokens[next_token].type == t_intdecliteral) {
+        if (tokens[next_token].type == t_intliteral) {
             PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("    ");
             // TODO actually process
-            next_token = match(t_intdecliteral, tokens, next_token);
+            next_token = match(t_intliteral, tokens, next_token);
             PARSE_TREE_PRINT("\n");
         } else {
             PARSE_TREE_PRINT_PADDING(); PARSE_TREE_PRINT("    ");
@@ -73,7 +73,7 @@ int statement_mmp_def_structure_item_bf_item_enum_item(Token *tokens, int next_t
     PARSE_TREE_PRINT("\n");
     PARSE_TREE_PRINT("                ");
     // TODO actually process
-    next_token = match(t_inthexliteral, tokens, next_token);
+    next_token = match(t_intliteral, tokens, next_token);
     PARSE_TREE_PRINT("\n");
     PARSE_TREE_PRINT("                ");
     next_token = match(t_semicolon, tokens, next_token);
@@ -116,10 +116,10 @@ int statement_mmp_def_structure_item_bf_item(Token *tokens, int next_token) {
     PARSE_TREE_PRINT("            ");
     next_token = match(t_colon, tokens, next_token);
     PARSE_TREE_PRINT("\n");
-    if (tokens[next_token].type == t_intdecliteral) {
+    if (tokens[next_token].type == t_intliteral) {
         PARSE_TREE_PRINT("            ");
         // TODO actually process
-        next_token = match(t_intdecliteral, tokens, next_token);
+        next_token = match(t_intliteral, tokens, next_token);
         PARSE_TREE_PRINT("\n");
     } else {
         // TODO
@@ -204,7 +204,7 @@ int statement_mmp_def_opt_interrupt_num(Token *tokens, int next_token) {
     PARSE_TREE_PRINT("\n");
     PARSE_TREE_PRINT("      ");
     // TODO actually process
-    next_token = match(t_intdecliteral, tokens, next_token);
+    next_token = match(t_intliteral, tokens, next_token);
     PARSE_TREE_PRINT("\n");
     return next_token;
 }
@@ -215,7 +215,7 @@ int statement_mmp_def_base_address(Token *tokens, int next_token) {
     PARSE_TREE_PRINT("\n");
     PARSE_TREE_PRINT("      ");
     // TODO actually process
-    next_token = match(t_inthexliteral, tokens, next_token);
+    next_token = match(t_intliteral, tokens, next_token);
     PARSE_TREE_PRINT("\n");
     return next_token;
 }
@@ -248,7 +248,7 @@ int statement_initialize_statement(Token *tokens, int next_token) {
     } else {
         PARSE_TREE_PRINT("      ");
         // TODO actually process
-        next_token = match(t_inthexliteral, tokens, next_token);
+        next_token = match(t_intliteral, tokens, next_token);
         PARSE_TREE_PRINT("\n");
     }
     PARSE_TREE_PRINT("      ");

@@ -47,13 +47,7 @@ int main(int argc, char *argv[]) {
 
     int token_num = lex(source, source_len, tokens);
 
-    char buf[256];
-    for (int i = 0; i < token_num; i++) {
-        strncpy(buf, tokens[i].lexeme.str, tokens[i].lexeme.len);
-        buf[tokens[i].lexeme.len] = 0;
-        printf("%s(%s, %lu) ", token_type_to_static_string(tokens[i].type), buf, tokens[i].int_value);
-    }
-    printf("\n");
+    print_tokens(tokens, token_num);
 
-    parse(tokens, token_num);
+    //parse(tokens, token_num);
 }

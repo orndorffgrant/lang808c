@@ -1,0 +1,9 @@
+# This is a comment
+# on_interrupt keyword auto-enables interrupt in NVIC
+on_interrupt RTCMode0 {
+  PortB.outtgl = (1 << 30);
+  RTCMode0/intflag = {
+    comp0 = 1;
+  };
+  # end of on_interrupt auto-clears interrupt in NVIC
+}

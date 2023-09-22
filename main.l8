@@ -1,4 +1,3 @@
-lexer demonstrate gibberish totally invalid token gets an error
 MemoryMappedPeripheral PortB @0x41004480 {
     dir: u32;
     dirclr: u32;

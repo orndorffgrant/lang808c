@@ -1,0 +1,6 @@
+fun blink_led(blink_times: u32): u32 {
+  for (u32 i = 0; i < blink_times; i = (i + 1)) {
+    PortB.outtgl = (1 << 30);
+  }
+  return 5;
+}
