@@ -325,7 +325,7 @@ void print_tokens(Token *tokens, int token_num) {
     for (int i = 0; i < token_num; i++) {
         strncpy(buf, tokens[i].lexeme.str, tokens[i].lexeme.len);
         buf[tokens[i].lexeme.len] = 0;
-        printf("%s(%s,%lu)\t", token_type_to_static_string(tokens[i].type), buf, tokens[i].int_value);
+        printf("%s(%s,%lu)    ", token_type_to_static_string(tokens[i].type), buf, tokens[i].int_value);
     }
     printf("\n");
 }

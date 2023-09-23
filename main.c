@@ -47,7 +47,6 @@ int main(int argc, char *argv[]) {
 
     int token_num = lex(source, source_len, tokens);
 
-    print_tokens(tokens, token_num);
-
-    //parse(tokens, token_num);
+    //print_tokens(tokens, token_num);
+    parse(tokens, token_num);
 }

@@ -14,6 +14,13 @@
 #define DELIM_CHARS "\0\n =(){}:;.,"
 #define DELIM_CHARS_LEN 12
 
+#define CREATE_TOKEN_STRING(t) char lexeme[256];\
+char token_str[512];\
+strncpy(lexeme, t.lexeme.str, t.lexeme.len);\
+lexeme[t.lexeme.len] = 0;\
+sprintf(token_str, "%s(%s,%lu)",\
+token_type_to_static_string(t.type), lexeme, t.int_value);
+
 typedef enum {
     t_NONE = 0,
     t_IGNORE,

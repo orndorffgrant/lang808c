@@ -241,13 +241,13 @@ initialize RTCMode0 {
 
 # This function just loops for a while to take up some time
 fun delay(delay_count: u32) {
-    for (u32 i = 0; i < delay_count; i = (i + 1)) {}
+    for (u32 i = 0; i < delay_count; i = i + 1;) {}
 }
 
 fun toggleLED() {
-    PortB.outtgl = (1 << 30);
+    PortB.outtgl = 1 << 30;
     delay(1000);
-    PortB.outtgl = (1 << 30);
+    PortB.outtgl = 1 << 30;
 }
 
 static u32 counting_up = 1;
