@@ -54,6 +54,7 @@ typedef enum {
     t_initialize,
     t_on_interrupt,
     t_fun,
+    t_static,
     t_for,
     t_if,
     t_else,

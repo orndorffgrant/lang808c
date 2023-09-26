@@ -252,10 +252,10 @@ fun toggleLED() {
 
 static u32 counting_up = 1;
 
-fun blink_and_update_blink_times(blink_times): u32 {
+fun blink_and_update_blink_times(blink_times: u32): u32 {
     u32 new_blink_times = 0;
 
-    for (u32 i = 0; i < blink_times; i = (i + 1)) {
+    for (u32 i = 0; i < blink_times; i = i + 1;) {
         blinkLED();
         delay(1000);
     }
@@ -281,7 +281,7 @@ static u32 blink_times = 1;
 # on_interrupt keyword auto-enables interrupt in NVIC
 on_interrupt RTCMode0 {
 
-    if ((PortB.in & (1 << 30)) == 0) {
+    if (PortB.in & 1 << 30 == 0) {
         # if button is not pressed, reset state
         blink_times = 1;
     } else {
@@ -295,5 +295,5 @@ on_interrupt RTCMode0 {
         comp0 = 1;
     };
     # end of on_interrupt auto-clears interrupt in NVIC
-};
+}
 

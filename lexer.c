@@ -44,6 +44,7 @@ char *token_type_to_static_string(TokenType token_type) {
         case t_initialize: return "initialize";
         case t_on_interrupt: return "on_interrupt";
         case t_fun: return "fun";
+        case t_static: return "static";
         case t_for: return "for";
         case t_if: return "if";
         case t_else: return "else";
@@ -239,13 +240,15 @@ TokenType token_type(StringRef str, char *lookahead) {
         return t_on_interrupt;
     } else if (str.len == 3 && strncmp(str.str, "fun", str.len) == 0) {
         return t_fun;
+    } else if (str.len == 6 && strncmp(str.str, "static", str.len) == 0) {
+        return t_static;
     } else if (str.len == 3 && strncmp(str.str, "for", str.len) == 0) {
         return t_for;
     } else if (str.len == 2 && strncmp(str.str, "if", str.len) == 0) {
         return t_if;
     } else if (str.len == 4 && strncmp(str.str, "else", str.len) == 0) {
         return t_else;
-    } else if (str.len == 4 && strncmp(str.str, "return", str.len) == 0) {
+    } else if (str.len == 6 && strncmp(str.str, "return", str.len) == 0) {
         return t_return;
     } else if (is_inttype(str, lookahead)) {
         return t_inttype;

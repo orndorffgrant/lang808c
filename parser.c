@@ -6,7 +6,7 @@
 int match(TokenType token_type, Token *tokens, int next_token, int indent) {
     if (tokens[next_token].type != token_type) {
         PANIC(
-            "Expected %s but found %s",
+            "Expected %s but found %s\n",
             token_type_to_static_string(token_type),
             token_type_to_static_string(tokens[next_token].type)
         );
@@ -82,6 +82,9 @@ int expression_sum(Token *tokens, int next_token, int indent) {
     switch (tokens[next_token].type) {
         case t_plus:
             next_token = match(t_plus, tokens, next_token, indent);
+            break;
+        case t_minus:
+            next_token = match(t_minus, tokens, next_token, indent);
             break;
         default:
             return next_token;
@@ -278,12 +281,54 @@ int initialize(Token *tokens, int next_token, int indent) {
 
 int function_statement(Token *tokens, int next_token, int indent);
 
+int function_statement_return(Token *tokens, int next_token, int indent) {
+    PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Return:\n");
+    next_token = match(t_return, tokens, next_token, indent);
+    next_token = expression(tokens, next_token, indent);
+    next_token = match(t_semicolon, tokens, next_token, indent);
+    return next_token;
+}
 int function_statement_assignment(Token *tokens, int next_token, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Assignment:\n");
     next_token = name(tokens, next_token, indent);
     next_token = match(t_equals, tokens, next_token, indent);
-    next_token = expression(tokens, next_token, indent);
+    if (tokens[next_token].type == t_id && tokens[next_token + 1].type == t_leftparen) {
+        next_token = function_call(tokens, next_token, indent);
+    } else if (tokens[next_token].type == t_leftbrace) {
+        next_token = bitfield_value(tokens, next_token, indent);
+    } else {
+        next_token = expression(tokens, next_token, indent);
+    }
     next_token = match(t_semicolon, tokens, next_token, indent);
+    return next_token;
+}
+int function_statement_if(Token *tokens, int next_token, int indent) {
+    PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- If:\n");
+    next_token = match(t_if, tokens, next_token, indent);
+    next_token = match(t_leftparen, tokens, next_token, indent);
+    next_token = expression(tokens, next_token, indent);
+    next_token = match(t_rightparen, tokens, next_token, indent);
+    next_token = match(t_leftbrace, tokens, next_token, indent);
+
+    while (tokens[next_token].type != t_rightbrace) {
+        // any number of function statements
+        next_token = function_statement(tokens, next_token, indent);
+    }
+
+    next_token = match(t_rightbrace, tokens, next_token, indent);
+
+    if (tokens[next_token].type == t_else) {
+        next_token = match(t_else, tokens, next_token, indent);
+        next_token = match(t_leftbrace, tokens, next_token, indent);
+
+        while (tokens[next_token].type != t_rightbrace) {
+            // any number of function statements
+            next_token = function_statement(tokens, next_token, indent);
+        }
+
+        next_token = match(t_rightbrace, tokens, next_token, indent);
+    }
+
     return next_token;
 }
 int function_statement_local_var(Token *tokens, int next_token, int indent) {
@@ -324,6 +369,8 @@ int function_statement(Token *tokens, int next_token, int indent) {
             return function_statement_for_loop(tokens, next_token, indent);
         case t_inttype:
             return function_statement_local_var(tokens, next_token, indent);
+        case t_if:
+            return function_statement_if(tokens, next_token, indent);
         case t_id:
             if (tokens[next_token+1].type == t_leftparen) {
                 next_token = function_call(tokens, next_token, indent);
@@ -332,6 +379,8 @@ int function_statement(Token *tokens, int next_token, int indent) {
             } else {
                 return function_statement_assignment(tokens, next_token, indent);
             }
+        case t_return:
+            return function_statement_return(tokens, next_token, indent);
         default:
             PANIC("invalid token at beginning of function statement\n");
     }
@@ -361,6 +410,12 @@ int function(Token *tokens, int next_token, int indent) {
     }
     next_token = match(t_rightparen, tokens, next_token, indent);
 
+    // optional return type
+    if (tokens[next_token].type == t_colon) {
+        next_token = match(t_colon, tokens, next_token, indent);
+        next_token = match(t_inttype, tokens, next_token, indent);
+    }
+
     next_token = match(t_leftbrace, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightbrace) {
         // any number of function statements
@@ -369,6 +424,32 @@ int function(Token *tokens, int next_token, int indent) {
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
 }
+
+int static_var(Token *tokens, int next_token, int indent) {
+    PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- StaticVariable:\n");
+    next_token = match(t_static, tokens, next_token, indent);
+    next_token = match(t_inttype, tokens, next_token, indent);
+    next_token = match(t_id, tokens, next_token, indent);
+    next_token = match(t_equals, tokens, next_token, indent);
+    next_token = match(t_intliteral, tokens, next_token, indent);
+    next_token = match(t_semicolon, tokens, next_token, indent);
+    return next_token;
+}
+
+int on_interrupt(Token *tokens, int next_token, int indent) {
+    PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- OnInterrupt:\n");
+    next_token = match(t_on_interrupt, tokens, next_token, indent);
+    // TODO actually process
+    next_token = match(t_id, tokens, next_token, indent);
+    next_token = match(t_leftbrace, tokens, next_token, indent);
+    while (tokens[next_token].type != t_rightbrace) {
+        // any number of function statements
+        next_token = function_statement(tokens, next_token, indent);
+    }
+    next_token = match(t_rightbrace, tokens, next_token, indent);
+    return next_token;
+}
+
 int root_statement(Token *tokens, int next_token) {
     switch (tokens[next_token].type) {
         case t_mmp:
@@ -377,6 +458,10 @@ int root_statement(Token *tokens, int next_token) {
             return initialize(tokens, next_token, 0);
         case t_fun:
             return function(tokens, next_token, 0);
+        case t_static:
+            return static_var(tokens, next_token, 0);
+        case t_on_interrupt:
+            return on_interrupt(tokens, next_token, 0);
         default:
             PANIC("invalid token at beginning of root statement\n");
     }
