@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "common.h"
 #include "lexer.h"
+#include "symbols.h"
 
 
 int match(TokenType token_type, Token *tokens, int next_token, int indent) {
@@ -14,6 +15,35 @@ int match(TokenType token_type, Token *tokens, int next_token, int indent) {
     CREATE_TOKEN_STRING(tokens[next_token]);
     PARSE_TREE_INDENT(indent); PARSE_TREE_PRINT("- %s\n", token_str);
     return next_token + 1;
+}
+int match_inttype(Token *tokens, int next_token, IntType *dest, int indent) {
+    Token t = tokens[next_token];
+    if (t.type == t_inttype) {
+        if (t.int_value == 8) {
+            *dest = int_u8;
+        } else if (t.int_value == 16) {
+            *dest = int_u16;
+        } else if (t.int_value == 32) {
+            *dest = int_u32;
+        } else {
+            PANIC("INVALID INTTYPE");
+        }
+    }
+    return match(t_inttype, tokens, next_token, indent);
+}
+int match_intliteral(Token *tokens, int next_token, int *dest, int indent) {
+    Token t = tokens[next_token];
+    if (t.type == t_intliteral) {
+        *dest = t.int_value;
+    }
+    return match(t_intliteral, tokens, next_token, indent);
+}
+int match_id(Token *tokens, int next_token, StringRef *dest, int indent) {
+    Token t = tokens[next_token];
+    if (t.type == t_id) {
+        *dest = t.lexeme;
+    }
+    return match(t_id, tokens, next_token, indent);
 }
 
 int name(Token *tokens, int next_token, int indent) {
@@ -179,75 +209,103 @@ int mmp_def_structure_item_bf_item(Token *tokens, int next_token, int indent) {
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
-int mmp_def_structure_item_bf(Token *tokens, int next_token, int indent) {
+int mmp_def_structure_item_bf(Token *tokens, int next_token, SymbolTable *symbols, StructItem *si, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitField:\n");
-    // TODO actually process
+    Token t = tokens[next_token];
+    if (t.type == t_bf) {
+        si->bf.width = t.int_value;
+    }
     next_token = match(t_bf, tokens, next_token, indent);
     next_token = match(t_leftbrace, tokens, next_token, indent);
 
+    si->bf.bf_items_index = -1;
+    int bfi_index = 0;
     while (tokens[next_token].type == t_id || tokens[next_token].type == t_unused) {
+        BitFieldItem bfi;
         // any number of bf items
+        // TODO start here
         next_token = mmp_def_structure_item_bf_item(tokens, next_token, indent);
+
+        bfi_index = add_bitfield_item(symbols, bfi);
+        if (si->bf.bf_items_index == -1) {
+            // first one
+            si->bf.bf_items_index = bfi_index;
+        }
     }
+    si->bf.bf_items_len = (bfi_index + 1) - si->bf.bf_items_index;
 
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
 }
-int mmp_def_structure_item(Token *tokens, int next_token, int indent) {
+int mmp_def_structure_item(Token *tokens, int next_token, SymbolTable *symbols, StructItem *si, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- StructureItem:\n");
     if (tokens[next_token].type == t_id) {
-        // TODO actually process
-        next_token = match(t_id, tokens, next_token, indent);
+        next_token = match_id(tokens, next_token, &si->name, indent);
     } else {
-        // TODO actually process
         next_token = match(t_unused, tokens, next_token, indent);
+        si->type = si_unused;
     }
     next_token = match(t_colon, tokens, next_token, indent);
     if (tokens[next_token].type == t_inttype) {
-        // TODO actually process
-        next_token = match(t_inttype, tokens, next_token, indent);
+        next_token = match_inttype(tokens, next_token, &si->int_type, indent);
+        if (si->type != si_unused) {
+            si->type = si_int;
+        }
     } else {
-        next_token = mmp_def_structure_item_bf(tokens, next_token, indent);
+        next_token = mmp_def_structure_item_bf(tokens, next_token, symbols, si, indent);
+        si->type = si_bf;
     }
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
-int mmp_def_structure(Token *tokens, int next_token, int indent) {
+int mmp_def_structure(Token *tokens, int next_token, SymbolTable *symbols, MemoryMappedPeripheral *mmp, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Structure:\n");
     next_token = match(t_leftbrace, tokens, next_token, indent);
+    mmp->struct_items_index = -1;
+    int si_index = 0;
     while (tokens[next_token].type == t_id || tokens[next_token].type == t_unused) {
-        // any number of structure items
-        next_token = mmp_def_structure_item(tokens, next_token, indent);
+        StructItem si;
+        next_token = mmp_def_structure_item(tokens, next_token, symbols, &si, indent);
+        si_index = add_struct_item(symbols, si);
+        if (mmp->struct_items_index == -1) {
+            // first one
+            mmp->struct_items_index = si_index;
+        }
     }
+    mmp->struct_items_len = (si_index + 1) - mmp->struct_items_index;
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
 }
-int mmp_def_opt_interrupt_num(Token *tokens, int next_token, int indent) {
+int mmp_def_opt_interrupt_num(Token *tokens, int next_token, int *dest, int indent) {
     if (tokens[next_token].type != t_bang) {
         PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- NoInterruptNum:\n");
+        *dest = -1;
         return next_token;
     }
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- InterruptNum:\n");
     next_token = match(t_bang, tokens, next_token, indent);
-    // TODO actually process
-    next_token = match(t_intliteral, tokens, next_token, indent);
+    next_token = match_intliteral(tokens, next_token, dest, indent);
     return next_token;
 }
-int mmp_def_base_address(Token *tokens, int next_token, int indent) {
+int mmp_def_base_address(Token *tokens, int next_token, int *dest, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BaseAddress:\n");
     next_token = match(t_at, tokens, next_token, indent);
-    // TODO actually process
-    next_token = match(t_intliteral, tokens, next_token, indent);
+    next_token = match_intliteral(tokens, next_token, dest, indent);
     return next_token;
 }
-int mmp_def(Token *tokens, int next_token, int indent) {
+int mmp_def(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- MemoryMappedPeripheral:\n");
+    MemoryMappedPeripheral mmp;
+
     next_token = match(t_mmp, tokens, next_token, indent);
     // TODO actually process
-    next_token = match(t_id, tokens, next_token, indent);
-    next_token = mmp_def_base_address(tokens, next_token, indent);
-    next_token = mmp_def_opt_interrupt_num(tokens, next_token, indent);
-    next_token = mmp_def_structure(tokens, next_token, indent);
+    next_token = match_id(tokens, next_token, &mmp.name, indent);
+
+    next_token = mmp_def_base_address(tokens, next_token, &mmp.base_address, indent);
+    next_token = mmp_def_opt_interrupt_num(tokens, next_token, &mmp.interrupt_number, indent);
+    next_token = mmp_def_structure(tokens, next_token, symbols, &mmp, indent);
+
+    add_mmp(symbols, mmp);
     return next_token;
 }
 int initialize_statement(Token *tokens, int next_token, int indent) {
@@ -450,10 +508,10 @@ int on_interrupt(Token *tokens, int next_token, int indent) {
     return next_token;
 }
 
-int root_statement(Token *tokens, int next_token) {
+int root_statement(Token *tokens, int next_token, SymbolTable *symbols) {
     switch (tokens[next_token].type) {
         case t_mmp:
-            return mmp_def(tokens, next_token, 0);
+            return mmp_def(tokens, next_token, symbols, 0);
         case t_initialize:
             return initialize(tokens, next_token, 0);
         case t_fun:
@@ -467,9 +525,9 @@ int root_statement(Token *tokens, int next_token) {
     }
 }
 
-int parse(Token *tokens, int token_num) {
+int parse(Token *tokens, int token_num, SymbolTable *symbols) {
     int next_token = 0;
     while (next_token < token_num) {
-        next_token = root_statement(tokens, next_token);
+        next_token = root_statement(tokens, next_token, symbols);
     }
 }
