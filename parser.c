@@ -165,46 +165,53 @@ int bitfield_value(Token *tokens, int next_token, int indent) {
     return next_token;
 }
 
-int mmp_def_structure_item_bf_item_enum_item(Token *tokens, int next_token, int indent) {
+int mmp_def_structure_item_bf_item_enum_item(Token *tokens, int next_token, BitEnumItem *bei, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitEnumItem:\n");
-    // TODO actually process
-    next_token = match(t_id, tokens, next_token, indent);
+    next_token = match_id(tokens, next_token, &bei->name, indent);
     next_token = match(t_equals, tokens, next_token, indent);
-    // TODO actually process
-    next_token = match(t_intliteral, tokens, next_token, indent);
+    next_token = match_intliteral(tokens, next_token, &bei->value, indent);
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
-int mmp_def_structure_item_bf_item_enum(Token *tokens, int next_token, int indent) {
+int mmp_def_structure_item_bf_item_enum(Token *tokens, int next_token, SymbolTable *symbols, BitEnum *be, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitEnum:\n");
-    // TODO actually process
     next_token = match(t_be, tokens, next_token, indent);
     next_token = match(t_leftbrace, tokens, next_token, indent);
 
+    be->be_items_index = -1;
+    int bei_index = 0;
     while (tokens[next_token].type == t_id || tokens[next_token].type == t_unused) {
-        // any number of bf items
-        next_token = mmp_def_structure_item_bf_item_enum_item(tokens, next_token, indent);
+        BitEnumItem bei;
+        // any number of be items
+        next_token = mmp_def_structure_item_bf_item_enum_item(tokens, next_token, &bei, indent);
+
+        bei_index = add_bitenum_item(symbols, bei);
+        if (be->be_items_index == -1) {
+            // first one
+            be->be_items_index = bei_index;
+        }
     }
+    be->be_items_len = (bei_index + 1) - be->be_items_index;
 
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
 }
-int mmp_def_structure_item_bf_item(Token *tokens, int next_token, int indent) {
+int mmp_def_structure_item_bf_item(Token *tokens, int next_token, SymbolTable *symbols, BitFieldItem *bfi, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitFieldItem:\n");
     if (tokens[next_token].type == t_id) {
-        // TODO actually process
-        next_token = match(t_id, tokens, next_token, indent);
+        next_token = match_id(tokens, next_token, &bfi->name, indent);
     } else {
-        // TODO actually process
         next_token = match(t_unused, tokens, next_token, indent);
+        bfi->type = bfi_unused;
     }
     next_token = match(t_colon, tokens, next_token, indent);
     if (tokens[next_token].type == t_intliteral) {
-        // TODO actually process
-        next_token = match(t_intliteral, tokens, next_token, indent);
+        next_token = match_intliteral(tokens, next_token, &bfi->width, indent);
+        if (bfi->type != bfi_unused) {
+            bfi->type = bfi_int;
+        }
     } else {
-        // TODO
-        next_token = mmp_def_structure_item_bf_item_enum(tokens, next_token, indent);
+        next_token = mmp_def_structure_item_bf_item_enum(tokens, next_token, symbols, &bfi->be, indent);
     }
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
@@ -223,8 +230,7 @@ int mmp_def_structure_item_bf(Token *tokens, int next_token, SymbolTable *symbol
     while (tokens[next_token].type == t_id || tokens[next_token].type == t_unused) {
         BitFieldItem bfi;
         // any number of bf items
-        // TODO start here
-        next_token = mmp_def_structure_item_bf_item(tokens, next_token, indent);
+        next_token = mmp_def_structure_item_bf_item(tokens, next_token, symbols, &bfi, indent);
 
         bfi_index = add_bitfield_item(symbols, bfi);
         if (si->bf.bf_items_index == -1) {

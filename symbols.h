@@ -20,7 +20,8 @@ typedef struct _BitEnum {
 } BitEnum;
 typedef enum {
     bfi_int,
-    bfi_enum
+    bfi_enum,
+    bfi_unused
 } BitFieldItemType;
 typedef struct _BitFieldItem {
     BitFieldItemType type;
