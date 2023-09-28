@@ -87,4 +87,6 @@ ADD_SYMBOL_FN_DEF(bitfield_item, BitFieldItem);
 ADD_SYMBOL_FN_DEF(bitenum, BitEnum);
 ADD_SYMBOL_FN_DEF(bitenum_item, BitEnumItem);
 
+int find_mmp_index(SymbolTable *symbols, StringRef *name);
+
 #endif

@@ -304,9 +304,7 @@ int mmp_def(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     MemoryMappedPeripheral mmp;
 
     next_token = match(t_mmp, tokens, next_token, indent);
-    // TODO actually process
     next_token = match_id(tokens, next_token, &mmp.name, indent);
-
     next_token = mmp_def_base_address(tokens, next_token, &mmp.base_address, indent);
     next_token = mmp_def_opt_interrupt_num(tokens, next_token, &mmp.interrupt_number, indent);
     next_token = mmp_def_structure(tokens, next_token, symbols, &mmp, indent);
@@ -329,11 +327,18 @@ int initialize_statement(Token *tokens, int next_token, int indent) {
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
-int initialize(Token *tokens, int next_token, int indent) {
+int initialize(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Initialize:\n");
     next_token = match(t_initialize, tokens, next_token, indent);
-    // TODO actually process
-    next_token = match(t_id, tokens, next_token, indent);
+
+    StringRef mmp_name;
+    next_token = match_id(tokens, next_token, &mmp_name, indent);
+    int mmp_index = find_mmp_index(symbols, &mmp_name);
+    if (mmp_index == -1) {
+        STRINGREF_TO_CSTR1(&mmp_name, 512);
+        PANIC("Cannot initialize undefined MemoryMappedPeripheral: %s\n", cstr1);
+    }
+
     next_token = match(t_leftbrace, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightbrace) {
         // any number of intialization statements
@@ -519,7 +524,7 @@ int root_statement(Token *tokens, int next_token, SymbolTable *symbols) {
         case t_mmp:
             return mmp_def(tokens, next_token, symbols, 0);
         case t_initialize:
-            return initialize(tokens, next_token, 0);
+            return initialize(tokens, next_token, symbols, 0);
         case t_fun:
             return function(tokens, next_token, 0);
         case t_static:
