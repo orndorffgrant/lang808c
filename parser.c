@@ -178,12 +178,18 @@ int bitfield_value(Token *tokens, int next_token, SymbolTable *symbols, int si_i
             PANIC("BitField field '%s' does not exist in struct item '%s'\n", cstr1, cstr2);
         }
         next_token = match(t_equals, tokens, next_token, indent);
-        if (tokens[next_token].type == t_intliteral) {
+        if (symbols->bitfield_items[bfi_index].type == bfi_int) {
             // TODO actually process
             next_token = match(t_intliteral, tokens, next_token, indent);
         } else {
-            // TODO actually process
-            next_token = match(t_id, tokens, next_token, indent);
+            StringRef be_item_name;
+            next_token = match_id(tokens, next_token, &be_item_name, indent);
+            int be_index = find_bitenum_item_index(symbols, bfi_index, &be_item_name);
+            if (be_index == -1) {
+                STRINGREF_TO_CSTR1(&bf_item_name, 512);
+                STRINGREF_TO_CSTR2(&be_item_name, 512);
+                PANIC("BitEnum for field '%s' does not include value called '%s'\n", cstr1, cstr2);
+            }
         }
         next_token = match(t_semicolon, tokens, next_token, indent);
     }
@@ -227,6 +233,7 @@ int mmp_def_structure_item_bf_item_enum(Token *tokens, int next_token, SymbolTab
 }
 int mmp_def_structure_item_bf_item(Token *tokens, int next_token, SymbolTable *symbols, BitFieldItem *bfi, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitFieldItem:\n");
+    bfi->type = bfi_int;
     if (tokens[next_token].type == t_id) {
         next_token = match_id(tokens, next_token, &bfi->name, indent);
     } else {
@@ -236,11 +243,9 @@ int mmp_def_structure_item_bf_item(Token *tokens, int next_token, SymbolTable *s
     next_token = match(t_colon, tokens, next_token, indent);
     if (tokens[next_token].type == t_intliteral) {
         next_token = match_intliteral(tokens, next_token, &bfi->width, indent);
-        if (bfi->type != bfi_unused) {
-            bfi->type = bfi_int;
-        }
     } else {
         next_token = mmp_def_structure_item_bf_item_enum(tokens, next_token, symbols, &bfi->be, indent);
+        bfi->type = bfi_enum;
     }
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;

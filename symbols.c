@@ -40,3 +40,14 @@ int find_bitfield_item_index(SymbolTable *symbols, int si_index, StringRef *name
     }
     return -1;
 }
+int find_bitenum_item_index(SymbolTable *symbols, int bfi_index, StringRef *name) {
+    BitFieldItem *bfi = &symbols->bitfield_items[bfi_index];
+    int begin = bfi->be.be_items_index;
+    int end = bfi->be.be_items_index + bfi->be.be_items_len;
+    for (int i = begin; i < end; i++) {
+        if (string_ref_eq(name, &symbols->bitenum_items[i].name)) {
+            return i;
+        }
+    }
+    return -1;
+}
