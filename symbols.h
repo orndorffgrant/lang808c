@@ -59,11 +59,11 @@ typedef struct _SymbolTable {
     int mmps_num;
     StructItem struct_items[1024];
     int struct_items_num;
-    BitField bitfields[1024];
+    BitField bitfields[1024]; // TODO I think unused?
     int bitfields_num;
     BitFieldItem bitfield_items[1024];
     int bitfield_items_num;
-    BitEnum bitenums[1024];
+    BitEnum bitenums[1024]; // TODO I think unused?
     int bitenums_num;
     BitEnumItem bitenum_items[1024];
     int bitenum_items_num;
@@ -88,5 +88,7 @@ ADD_SYMBOL_FN_DEF(bitenum, BitEnum);
 ADD_SYMBOL_FN_DEF(bitenum_item, BitEnumItem);
 
 int find_mmp_index(SymbolTable *symbols, StringRef *name);
+int find_struct_item_index(SymbolTable *symbols, int mmp_index, StringRef *name);
+int find_bitfield_item_index(SymbolTable *symbols, int si_index, StringRef *name);
 
 #endif

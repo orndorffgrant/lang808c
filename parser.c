@@ -46,24 +46,27 @@ int match_id(Token *tokens, int next_token, StringRef *dest, int indent) {
     return match(t_id, tokens, next_token, indent);
 }
 
-int name(Token *tokens, int next_token, int indent) {
+int name(Token *tokens, int next_token, int max, StringRef *dests, int *num_read, int indent) {
+    int i = 1;
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Name:\n");
-    next_token = match(t_id, tokens, next_token, indent);
-    while (tokens[next_token].type == t_dot) {
+    next_token = match_id(tokens, next_token, &dests[0], indent);
+    while (tokens[next_token].type == t_dot && i < max) {
         next_token = match(t_dot, tokens, next_token, indent);
-        next_token = match(t_id, tokens, next_token, indent);
+        next_token = match_id(tokens, next_token, &dests[i], indent);
+        i++;
     }
+    *num_read = i;
     return next_token;
 }
 
-int expression(Token *tokens, int next_token, int indent);
+int expression(Token *tokens, int next_token, SymbolTable *symbols, int indent);
 
-int function_call(Token *tokens, int next_token, int indent) {
+int function_call(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- FunctionCall:\n");
     next_token = match(t_id, tokens, next_token, indent);
     next_token = match(t_leftparen, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightparen) {
-        next_token = expression(tokens, next_token, indent);
+        next_token = expression(tokens, next_token, symbols, indent);
         if (tokens[next_token].type != t_rightparen) {
             next_token = match(t_comma, tokens, next_token, indent);
         }
@@ -71,18 +74,38 @@ int function_call(Token *tokens, int next_token, int indent) {
     next_token = match(t_rightparen, tokens, next_token, indent);
     return next_token;
 }
-int expression_term(Token *tokens, int next_token, int indent) {
+int expression_term(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ExpressionTerm:\n");
     if (tokens[next_token].type == t_intliteral) {
         next_token = match(t_intliteral, tokens, next_token, indent);
     } else {
-        next_token = name(tokens, next_token, indent);
+        StringRef name_ids[2];
+        int num_names;
+        int mmp_index = -1;
+        int si_index = -1;
+        next_token = name(tokens, next_token, 2, name_ids, &num_names, indent);
+        if (num_names == 2) {
+            // Must be field on an MMP
+            StringRef mmp_name = name_ids[0];
+            StringRef struct_item_name = name_ids[1];
+            mmp_index = find_mmp_index(symbols, &mmp_name);
+            if (mmp_index == -1) {
+                STRINGREF_TO_CSTR1(&mmp_name, 512);
+                PANIC("Cannot initialize undefined MemoryMappedPeripheral: %s\n", cstr1);
+            }
+            si_index = find_struct_item_index(symbols, mmp_index, &struct_item_name);
+            if (si_index == -1) {
+                STRINGREF_TO_CSTR1(&struct_item_name, 512);
+                STRINGREF_TO_CSTR2(&symbols->mmps[mmp_index].name, 512);
+                PANIC("Field '%s' does not exist in '%s'\n", cstr1, cstr2);
+            }
+        }
     }
     return next_token;
 }
-int expression_shift(Token *tokens, int next_token, int indent) {
+int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ShiftExpression:\n");
-    next_token = expression_term(tokens, next_token, indent);
+    next_token = expression_term(tokens, next_token, symbols, indent);
     switch (tokens[next_token].type) {
         case t_shiftleft:
             next_token = match(t_shiftleft, tokens, next_token, indent);
@@ -90,12 +113,12 @@ int expression_shift(Token *tokens, int next_token, int indent) {
         default:
             return next_token;
     }
-    next_token = expression_term(tokens, next_token, indent);
+    next_token = expression_term(tokens, next_token, symbols, indent);
     return next_token;
 }
-int expression_bit(Token *tokens, int next_token, int indent) {
+int expression_bit(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitExpression:\n");
-    next_token = expression_shift(tokens, next_token, indent);
+    next_token = expression_shift(tokens, next_token, symbols, indent);
     switch (tokens[next_token].type) {
         case t_and:
             next_token = match(t_and, tokens, next_token, indent);
@@ -103,12 +126,12 @@ int expression_bit(Token *tokens, int next_token, int indent) {
         default:
             return next_token;
     }
-    next_token = expression_shift(tokens, next_token, indent);
+    next_token = expression_shift(tokens, next_token, symbols, indent);
     return next_token;
 }
-int expression_sum(Token *tokens, int next_token, int indent) {
+int expression_sum(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- SumExpression:\n");
-    next_token = expression_bit(tokens, next_token, indent);
+    next_token = expression_bit(tokens, next_token, symbols, indent);
     switch (tokens[next_token].type) {
         case t_plus:
             next_token = match(t_plus, tokens, next_token, indent);
@@ -119,13 +142,13 @@ int expression_sum(Token *tokens, int next_token, int indent) {
         default:
             return next_token;
     }
-    next_token = expression_bit(tokens, next_token, indent);
+    next_token = expression_bit(tokens, next_token, symbols, indent);
     return next_token;
 }
-int expression(Token *tokens, int next_token, int indent) {
+int expression(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     // top level expression is comparison
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Expression:\n");
-    next_token = expression_sum(tokens, next_token, indent);
+    next_token = expression_sum(tokens, next_token, symbols, indent);
     switch (tokens[next_token].type) {
         case t_equalsequals:
             next_token = match(t_equalsequals, tokens, next_token, indent);
@@ -136,18 +159,24 @@ int expression(Token *tokens, int next_token, int indent) {
         default:
             return next_token;
     }
-    next_token = expression_sum(tokens, next_token, indent);
+    next_token = expression_sum(tokens, next_token, symbols, indent);
     return next_token;
 }
 
-int bitfield_value(Token *tokens, int next_token, int indent) {
+int bitfield_value(Token *tokens, int next_token, SymbolTable *symbols, int si_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitFieldValue:\n");
     next_token = match(t_leftbrace, tokens, next_token, indent);
 
     while (tokens[next_token].type != t_rightbrace) {
         PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitFieldValueItem:\n");
-        // TODO actually process
-        next_token = match(t_id, tokens, next_token, indent);
+        StringRef bf_item_name;
+        next_token = match_id(tokens, next_token, &bf_item_name, indent);
+        int bfi_index = find_bitfield_item_index(symbols, si_index, &bf_item_name);
+        if (bfi_index == -1) {
+            STRINGREF_TO_CSTR1(&bf_item_name, 512);
+            STRINGREF_TO_CSTR2(&symbols->struct_items[si_index].name, 512);
+            PANIC("BitField field '%s' does not exist in struct item '%s'\n", cstr1, cstr2);
+        }
         next_token = match(t_equals, tokens, next_token, indent);
         if (tokens[next_token].type == t_intliteral) {
             // TODO actually process
@@ -312,17 +341,26 @@ int mmp_def(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     add_mmp(symbols, mmp);
     return next_token;
 }
-int initialize_statement(Token *tokens, int next_token, int indent) {
+int initialize_statement(Token *tokens, int next_token, SymbolTable *symbols, int mmp_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- InitializeStatement:\n");
-    // TODO actually process
-    next_token = match(t_id, tokens, next_token, indent);
+    StringRef struct_item_name;
+    next_token = match_id(tokens, next_token, &struct_item_name, indent);
+    int si_index = find_struct_item_index(symbols, mmp_index, &struct_item_name);
+    if (si_index == -1) {
+        STRINGREF_TO_CSTR1(&struct_item_name, 512);
+        STRINGREF_TO_CSTR2(&symbols->mmps[mmp_index].name, 512);
+        PANIC("Field '%s' does not exist in '%s'\n", cstr1, cstr2);
+    }
+
     next_token = match(t_equals, tokens, next_token, indent);
 
-    if (tokens[next_token].type == t_leftbrace) {
-        next_token = bitfield_value(tokens, next_token, indent);
+    if (symbols->struct_items[si_index].type == si_bf) {
+        // TODO create IR
+        next_token = bitfield_value(tokens, next_token, symbols, si_index, indent);
     } else {
-        // TODO actually process
-        next_token = match(t_intliteral, tokens, next_token, indent);
+        // TODO create IR
+        int value = 0;
+        next_token = match_intliteral(tokens, next_token, &value, indent);
     }
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
@@ -342,46 +380,69 @@ int initialize(Token *tokens, int next_token, SymbolTable *symbols, int indent) 
     next_token = match(t_leftbrace, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightbrace) {
         // any number of intialization statements
-        next_token = initialize_statement(tokens, next_token, indent);
+        next_token = initialize_statement(tokens, next_token, symbols, mmp_index, indent);
     }
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
 }
 
-int function_statement(Token *tokens, int next_token, int indent);
+int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int indent);
 
-int function_statement_return(Token *tokens, int next_token, int indent) {
+int function_statement_return(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Return:\n");
     next_token = match(t_return, tokens, next_token, indent);
-    next_token = expression(tokens, next_token, indent);
+    next_token = expression(tokens, next_token, symbols, indent);
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
-int function_statement_assignment(Token *tokens, int next_token, int indent) {
+int function_statement_assignment(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Assignment:\n");
-    next_token = name(tokens, next_token, indent);
+    // TODO support static vars and local vars
+    StringRef name_ids[2];
+    int num_names;
+    int mmp_index = -1;
+    int si_index = -1;
+    next_token = name(tokens, next_token, 2, name_ids, &num_names, indent);
+    if (num_names == 2) {
+        // Must be field on an MMP
+        StringRef mmp_name = name_ids[0];
+        StringRef struct_item_name = name_ids[1];
+        mmp_index = find_mmp_index(symbols, &mmp_name);
+        if (mmp_index == -1) {
+            STRINGREF_TO_CSTR1(&mmp_name, 512);
+            PANIC("Cannot initialize undefined MemoryMappedPeripheral: %s\n", cstr1);
+        }
+        si_index = find_struct_item_index(symbols, mmp_index, &struct_item_name);
+        if (si_index == -1) {
+            STRINGREF_TO_CSTR1(&struct_item_name, 512);
+            STRINGREF_TO_CSTR2(&symbols->mmps[mmp_index].name, 512);
+            PANIC("Field '%s' does not exist in '%s'\n", cstr1, cstr2);
+        }
+    }
+
     next_token = match(t_equals, tokens, next_token, indent);
     if (tokens[next_token].type == t_id && tokens[next_token + 1].type == t_leftparen) {
-        next_token = function_call(tokens, next_token, indent);
+        next_token = function_call(tokens, next_token, symbols, indent);
     } else if (tokens[next_token].type == t_leftbrace) {
-        next_token = bitfield_value(tokens, next_token, indent);
+        // TODO
+        next_token = bitfield_value(tokens, next_token, symbols, si_index, indent);
     } else {
-        next_token = expression(tokens, next_token, indent);
+        next_token = expression(tokens, next_token, symbols, indent);
     }
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
-int function_statement_if(Token *tokens, int next_token, int indent) {
+int function_statement_if(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- If:\n");
     next_token = match(t_if, tokens, next_token, indent);
     next_token = match(t_leftparen, tokens, next_token, indent);
-    next_token = expression(tokens, next_token, indent);
+    next_token = expression(tokens, next_token, symbols, indent);
     next_token = match(t_rightparen, tokens, next_token, indent);
     next_token = match(t_leftbrace, tokens, next_token, indent);
 
     while (tokens[next_token].type != t_rightbrace) {
         // any number of function statements
-        next_token = function_statement(tokens, next_token, indent);
+        next_token = function_statement(tokens, next_token, symbols, indent);
     }
 
     next_token = match(t_rightbrace, tokens, next_token, indent);
@@ -392,7 +453,7 @@ int function_statement_if(Token *tokens, int next_token, int indent) {
 
         while (tokens[next_token].type != t_rightbrace) {
             // any number of function statements
-            next_token = function_statement(tokens, next_token, indent);
+            next_token = function_statement(tokens, next_token, symbols, indent);
         }
 
         next_token = match(t_rightbrace, tokens, next_token, indent);
@@ -409,47 +470,47 @@ int function_statement_local_var(Token *tokens, int next_token, int indent) {
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
-int function_statement_for_loop(Token *tokens, int next_token, int indent) {
+int function_statement_for_loop(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ForLoop:\n");
     next_token = match(t_for, tokens, next_token, indent);
     next_token = match(t_leftparen, tokens, next_token, indent);
 
-    next_token = function_statement(tokens, next_token, indent);
+    next_token = function_statement(tokens, next_token, symbols, indent);
 
-    next_token = expression(tokens, next_token, indent);
+    next_token = expression(tokens, next_token, symbols, indent);
     next_token = match(t_semicolon, tokens, next_token, indent);
 
-    next_token = function_statement(tokens, next_token, indent);
+    next_token = function_statement(tokens, next_token, symbols, indent);
 
     next_token = match(t_rightparen, tokens, next_token, indent);
     next_token = match(t_leftbrace, tokens, next_token, indent);
 
     while (tokens[next_token].type != t_rightbrace) {
         // any number of function statements
-        next_token = function_statement(tokens, next_token, indent);
+        next_token = function_statement(tokens, next_token, symbols, indent);
     }
 
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
 }
-int function_statement(Token *tokens, int next_token, int indent) {
+int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     switch (tokens[next_token].type) {
         case t_for:
-            return function_statement_for_loop(tokens, next_token, indent);
+            return function_statement_for_loop(tokens, next_token, symbols, indent);
         case t_inttype:
             return function_statement_local_var(tokens, next_token, indent);
         case t_if:
-            return function_statement_if(tokens, next_token, indent);
+            return function_statement_if(tokens, next_token, symbols, indent);
         case t_id:
             if (tokens[next_token+1].type == t_leftparen) {
-                next_token = function_call(tokens, next_token, indent);
+                next_token = function_call(tokens, next_token, symbols, indent);
                 next_token = match(t_semicolon, tokens, next_token, indent);
                 return next_token;
             } else {
-                return function_statement_assignment(tokens, next_token, indent);
+                return function_statement_assignment(tokens, next_token, symbols, indent);
             }
         case t_return:
-            return function_statement_return(tokens, next_token, indent);
+            return function_statement_return(tokens, next_token, symbols, indent);
         default:
             PANIC("invalid token at beginning of function statement\n");
     }
@@ -463,7 +524,7 @@ int function_argument(Token *tokens, int next_token, int indent) {
     next_token = match(t_inttype, tokens, next_token, indent);
     return next_token;
 }
-int function(Token *tokens, int next_token, int indent) {
+int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Function:\n");
     next_token = match(t_fun, tokens, next_token, indent);
     // TODO actually process
@@ -488,7 +549,7 @@ int function(Token *tokens, int next_token, int indent) {
     next_token = match(t_leftbrace, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightbrace) {
         // any number of function statements
-        next_token = function_statement(tokens, next_token, indent);
+        next_token = function_statement(tokens, next_token, symbols, indent);
     }
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
@@ -505,7 +566,7 @@ int static_var(Token *tokens, int next_token, int indent) {
     return next_token;
 }
 
-int on_interrupt(Token *tokens, int next_token, int indent) {
+int on_interrupt(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- OnInterrupt:\n");
     next_token = match(t_on_interrupt, tokens, next_token, indent);
     // TODO actually process
@@ -513,7 +574,7 @@ int on_interrupt(Token *tokens, int next_token, int indent) {
     next_token = match(t_leftbrace, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightbrace) {
         // any number of function statements
-        next_token = function_statement(tokens, next_token, indent);
+        next_token = function_statement(tokens, next_token, symbols, indent);
     }
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
@@ -526,11 +587,11 @@ int root_statement(Token *tokens, int next_token, SymbolTable *symbols) {
         case t_initialize:
             return initialize(tokens, next_token, symbols, 0);
         case t_fun:
-            return function(tokens, next_token, 0);
+            return function(tokens, next_token, symbols, 0);
         case t_static:
             return static_var(tokens, next_token, 0);
         case t_on_interrupt:
-            return on_interrupt(tokens, next_token, 0);
+            return on_interrupt(tokens, next_token, symbols, 0);
         default:
             PANIC("invalid token at beginning of root statement\n");
     }
