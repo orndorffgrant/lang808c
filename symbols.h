@@ -54,6 +54,24 @@ typedef struct _MemoryMappedPeripheral {
     int struct_items_len;
 } MemoryMappedPeripheral;
 
+typedef struct _Variable {
+    StringRef name;
+    IntType int_type;
+    int initial_value;
+} Variable;
+
+typedef struct _FunctionArg {
+    StringRef name;
+    IntType int_type;
+} FunctionArg;
+typedef struct _Function {
+    StringRef name;
+    int func_args_index;
+    int func_args_len;
+    bool returns;
+    IntType return_type;
+} Function;
+
 typedef struct _SymbolTable {
     MemoryMappedPeripheral mmps[1024];
     int mmps_num;
@@ -63,12 +81,23 @@ typedef struct _SymbolTable {
     int bitfield_items_num;
     BitEnumItem bitenum_items[1024];
     int bitenum_items_num;
+
+    Variable static_vars[1024];
+    int static_vars_num;
+    Function functions[1024];
+    int functions_num;
+    FunctionArg func_args[1024];
+    int func_args_num;
+    Variable function_vars[1024];
+    int function_vars_num;
 } SymbolTable;
 
 int add_mmp(SymbolTable *symbols, MemoryMappedPeripheral item);
 int add_struct_item(SymbolTable *symbols, StructItem item);
 int add_bitfield_item(SymbolTable *symbols, BitFieldItem item);
 int add_bitenum_item(SymbolTable *symbols, BitEnumItem item);
+int add_function(SymbolTable *symbols, Function item);
+int add_function_arg(SymbolTable *symbols, FunctionArg item);
 
 int find_mmp_index(SymbolTable *symbols, StringRef *name);
 int find_struct_item_index(SymbolTable *symbols, int mmp_index, StringRef *name);

@@ -63,6 +63,7 @@ int expression(Token *tokens, int next_token, SymbolTable *symbols, int indent);
 
 int function_call(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- FunctionCall:\n");
+    // TODO check call signature
     next_token = match(t_id, tokens, next_token, indent);
     next_token = match(t_leftparen, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightparen) {
@@ -520,35 +521,49 @@ int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int 
             PANIC("invalid token at beginning of function statement\n");
     }
 }
-int function_argument(Token *tokens, int next_token, int indent) {
+int function_argument(Token *tokens, int next_token, FunctionArg *fa, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- FunctionArgument:\n");
-    // TODO actually process
-    next_token = match(t_id, tokens, next_token, indent);
+    next_token = match_id(tokens, next_token, &fa->name, indent);
     next_token = match(t_colon, tokens, next_token, indent);
-    // TODO actually process
-    next_token = match(t_inttype, tokens, next_token, indent);
+    next_token = match_inttype(tokens, next_token, &fa->int_type, indent);
     return next_token;
 }
 int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Function:\n");
+    Function func;
+
     next_token = match(t_fun, tokens, next_token, indent);
-    // TODO actually process
-    next_token = match(t_id, tokens, next_token, indent);
+    next_token = match_id(tokens, next_token, &func.name, indent);
     next_token = match(t_leftparen, tokens, next_token, indent);
+
+    func.func_args_index = -1;
+    int fa_index = 0;
     while (tokens[next_token].type != t_rightparen) {
         // any number of args
-        next_token = function_argument(tokens, next_token, indent);
+        FunctionArg fa;
+        next_token = function_argument(tokens, next_token, &fa, indent);
+        fa_index = add_function_arg(symbols, fa);
+        if (func.func_args_index == -1) {
+            // first one
+            func.func_args_index = fa_index;
+        }
+
         if (tokens[next_token].type == t_rightparen) {
             break;
         }
         next_token = match(t_comma, tokens, next_token, indent);
     }
+    func.func_args_len = (fa_index + 1) - func.func_args_index;
+
     next_token = match(t_rightparen, tokens, next_token, indent);
 
     // optional return type
     if (tokens[next_token].type == t_colon) {
+        func.returns = true;
         next_token = match(t_colon, tokens, next_token, indent);
-        next_token = match(t_inttype, tokens, next_token, indent);
+        next_token = match_inttype(tokens, next_token, &func.return_type, indent);
+    } else {
+        func.returns = false;
     }
 
     next_token = match(t_leftbrace, tokens, next_token, indent);
@@ -557,6 +572,8 @@ int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
         next_token = function_statement(tokens, next_token, symbols, indent);
     }
     next_token = match(t_rightbrace, tokens, next_token, indent);
+
+    add_function(symbols, func);
     return next_token;
 }
 

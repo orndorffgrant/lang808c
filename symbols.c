@@ -19,6 +19,14 @@ int add_bitenum_item(SymbolTable *symbols, BitEnumItem item) {
   symbols->bitenum_items[symbols->bitenum_items_num] = item;
   return symbols->bitenum_items_num++;
 }
+int add_function(SymbolTable *symbols, Function item) {
+  symbols->functions[symbols->functions_num] = item;
+  return symbols->functions_num++;
+}
+int add_function_arg(SymbolTable *symbols, FunctionArg item) {
+  symbols->func_args[symbols->func_args_num] = item;
+  return symbols->func_args_num++;
+}
 
 int find_mmp_index(SymbolTable *symbols, StringRef *name) {
     for (int i = 0; i < symbols->mmps_num; i++) {
