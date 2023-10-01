@@ -59,33 +59,16 @@ typedef struct _SymbolTable {
     int mmps_num;
     StructItem struct_items[1024];
     int struct_items_num;
-    BitField bitfields[1024]; // TODO I think unused?
-    int bitfields_num;
     BitFieldItem bitfield_items[1024];
     int bitfield_items_num;
-    BitEnum bitenums[1024]; // TODO I think unused?
-    int bitenums_num;
     BitEnumItem bitenum_items[1024];
     int bitenum_items_num;
-
-
 } SymbolTable;
 
-#define ADD_SYMBOL_FN_DEF(symbol_name, symbol_type) int add_##symbol_name(\
-    SymbolTable *symbols,\
-    symbol_type item)
-#define ADD_SYMBOL_FN(symbol_name, symbol_type) \
-    ADD_SYMBOL_FN_DEF(symbol_name, symbol_type) {\
-    symbols->symbol_name##s[symbols->symbol_name##s_num] = item;\
-    return symbols->symbol_name##s_num++;\
-}
-
-ADD_SYMBOL_FN_DEF(mmp, MemoryMappedPeripheral);
-ADD_SYMBOL_FN_DEF(struct_item, StructItem);
-ADD_SYMBOL_FN_DEF(bitfield, BitField);
-ADD_SYMBOL_FN_DEF(bitfield_item, BitFieldItem);
-ADD_SYMBOL_FN_DEF(bitenum, BitEnum);
-ADD_SYMBOL_FN_DEF(bitenum_item, BitEnumItem);
+int add_mmp(SymbolTable *symbols, MemoryMappedPeripheral item);
+int add_struct_item(SymbolTable *symbols, StructItem item);
+int add_bitfield_item(SymbolTable *symbols, BitFieldItem item);
+int add_bitenum_item(SymbolTable *symbols, BitEnumItem item);
 
 int find_mmp_index(SymbolTable *symbols, StringRef *name);
 int find_struct_item_index(SymbolTable *symbols, int mmp_index, StringRef *name);
