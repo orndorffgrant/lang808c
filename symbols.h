@@ -103,5 +103,6 @@ int find_mmp_index(SymbolTable *symbols, StringRef *name);
 int find_struct_item_index(SymbolTable *symbols, int mmp_index, StringRef *name);
 int find_bitfield_item_index(SymbolTable *symbols, int si_index, StringRef *name);
 int find_bitenum_item_index(SymbolTable *symbols, int bfi_index, StringRef *name);
+int find_function_index(SymbolTable *symbols, StringRef *name);
 
 #endif

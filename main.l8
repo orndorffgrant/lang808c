@@ -244,7 +244,7 @@ fun delay(delay_count: u32) {
     for (u32 i = 0; i < delay_count; i = i + 1;) {}
 }
 
-fun toggleLED() {
+fun blinkLED() {
     PortB.outtgl = 1 << 30;
     delay(1000);
     PortB.outtgl = 1 << 30;

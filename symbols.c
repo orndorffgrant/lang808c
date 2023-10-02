@@ -69,3 +69,12 @@ int find_bitenum_item_index(SymbolTable *symbols, int bfi_index, StringRef *name
     }
     return -1;
 }
+
+int find_function_index(SymbolTable *symbols, StringRef *name) {
+    for (int i = 0; i < symbols->functions_num; i++) {
+        if (string_ref_eq(name, &symbols->functions[i].name)) {
+            return i;
+        }
+    }
+    return -1;
+}

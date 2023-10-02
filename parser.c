@@ -63,14 +63,26 @@ int expression(Token *tokens, int next_token, SymbolTable *symbols, int indent);
 
 int function_call(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- FunctionCall:\n");
-    // TODO check call signature
-    next_token = match(t_id, tokens, next_token, indent);
+    StringRef func_name;
+    next_token = match_id(tokens, next_token, &func_name, indent);
+    int func_index = find_function_index(symbols, &func_name);
+    if (func_index == -1) {
+        STRINGREF_TO_CSTR1(&func_name, 512);
+        PANIC("Function '%s' does not exist\n", cstr1);
+    }
+    int num_args = 0;
     next_token = match(t_leftparen, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightparen) {
         next_token = expression(tokens, next_token, symbols, indent);
+        num_args++;
         if (tokens[next_token].type != t_rightparen) {
             next_token = match(t_comma, tokens, next_token, indent);
         }
+    }
+    int expected_args = symbols->functions[func_index].func_args_len;
+    if (num_args != expected_args) {
+        STRINGREF_TO_CSTR1(&func_name, 512);
+        PANIC("Incorrect number of arguments to function '%s'. Expected %d but got %d.\n", cstr1, expected_args, num_args);
     }
     next_token = match(t_rightparen, tokens, next_token, indent);
     return next_token;
@@ -537,6 +549,7 @@ int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     next_token = match(t_leftparen, tokens, next_token, indent);
 
     func.func_args_index = -1;
+    func.func_args_len = 0;
     int fa_index = 0;
     while (tokens[next_token].type != t_rightparen) {
         // any number of args
@@ -547,13 +560,13 @@ int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
             // first one
             func.func_args_index = fa_index;
         }
+        func.func_args_len++;
 
         if (tokens[next_token].type == t_rightparen) {
             break;
         }
         next_token = match(t_comma, tokens, next_token, indent);
     }
-    func.func_args_len = (fa_index + 1) - func.func_args_index;
 
     next_token = match(t_rightparen, tokens, next_token, indent);
 
