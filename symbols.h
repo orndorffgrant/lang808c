@@ -68,9 +68,15 @@ typedef struct _Function {
     StringRef name;
     int func_args_index;
     int func_args_len;
+    int func_vars_index;
+    int func_vars_len;
     bool returns;
     IntType return_type;
 } Function;
+typedef struct _InterruptHandler {
+    int interrupt_number;
+    int func_index;
+} InterruptHandler;
 
 typedef struct _SymbolTable {
     MemoryMappedPeripheral mmps[1024];
@@ -90,6 +96,9 @@ typedef struct _SymbolTable {
     int func_args_num;
     Variable function_vars[1024];
     int function_vars_num;
+
+    InterruptHandler interrupt_handlers[1024];
+    int interrupt_handlers_num;
 } SymbolTable;
 
 int add_mmp(SymbolTable *symbols, MemoryMappedPeripheral item);
@@ -98,11 +107,15 @@ int add_bitfield_item(SymbolTable *symbols, BitFieldItem item);
 int add_bitenum_item(SymbolTable *symbols, BitEnumItem item);
 int add_function(SymbolTable *symbols, Function item);
 int add_function_arg(SymbolTable *symbols, FunctionArg item);
+int add_static_variable(SymbolTable *symbols, Variable item);
+int add_function_variable(SymbolTable *symbols, Variable item);
 
 int find_mmp_index(SymbolTable *symbols, StringRef *name);
 int find_struct_item_index(SymbolTable *symbols, int mmp_index, StringRef *name);
 int find_bitfield_item_index(SymbolTable *symbols, int si_index, StringRef *name);
 int find_bitenum_item_index(SymbolTable *symbols, int bfi_index, StringRef *name);
 int find_function_index(SymbolTable *symbols, StringRef *name);
+int find_function_variable(SymbolTable *symbols, int func_index, StringRef *name);
+int find_static_variable(SymbolTable *symbols, StringRef *name);
 
 #endif

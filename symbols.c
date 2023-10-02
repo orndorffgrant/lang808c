@@ -27,6 +27,14 @@ int add_function_arg(SymbolTable *symbols, FunctionArg item) {
   symbols->func_args[symbols->func_args_num] = item;
   return symbols->func_args_num++;
 }
+int add_static_variable(SymbolTable *symbols, Variable item) {
+  symbols->static_vars[symbols->static_vars_num] = item;
+  return symbols->static_vars_num++;
+}
+int add_function_variable(SymbolTable *symbols, Variable item) {
+  symbols->function_vars[symbols->function_vars_num] = item;
+  return symbols->function_vars_num++;
+}
 
 int find_mmp_index(SymbolTable *symbols, StringRef *name) {
     for (int i = 0; i < symbols->mmps_num; i++) {
@@ -73,6 +81,26 @@ int find_bitenum_item_index(SymbolTable *symbols, int bfi_index, StringRef *name
 int find_function_index(SymbolTable *symbols, StringRef *name) {
     for (int i = 0; i < symbols->functions_num; i++) {
         if (string_ref_eq(name, &symbols->functions[i].name)) {
+            return i;
+        }
+    }
+    return -1;
+}
+int find_function_variable(SymbolTable *symbols, int func_index, StringRef *name) {
+    Function *func = &symbols->functions[func_index];
+    int begin = func->func_vars_index;
+    int end = func->func_vars_index + func->func_vars_len;
+    for (int i = begin; i < end; i++) {
+        if (string_ref_eq(name, &symbols->function_vars[i].name)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int find_static_variable(SymbolTable *symbols, StringRef *name) {
+    for (int i = 0; i < symbols->static_vars_num; i++) {
+        if (string_ref_eq(name, &symbols->static_vars[i].name)) {
             return i;
         }
     }

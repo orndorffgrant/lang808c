@@ -404,7 +404,7 @@ int initialize(Token *tokens, int next_token, SymbolTable *symbols, int indent) 
     return next_token;
 }
 
-int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int indent);
+int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent);
 
 int function_statement_return(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Return:\n");
@@ -413,13 +413,15 @@ int function_statement_return(Token *tokens, int next_token, SymbolTable *symbol
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
-int function_statement_assignment(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
+int function_statement_assignment(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Assignment:\n");
     // TODO support static vars and local vars
     StringRef name_ids[2];
     int num_names;
     int mmp_index = -1;
     int si_index = -1;
+    int static_var_index = -1;
+    int local_var_index = -1;
     next_token = name(tokens, next_token, 2, name_ids, &num_names, indent);
     if (num_names == 2) {
         // Must be field on an MMP
@@ -436,6 +438,18 @@ int function_statement_assignment(Token *tokens, int next_token, SymbolTable *sy
             STRINGREF_TO_CSTR2(&symbols->mmps[mmp_index].name, 512);
             PANIC("Field '%s' does not exist in '%s'\n", cstr1, cstr2);
         }
+    } else {
+        // TODO I think the provlem is here
+        // must be a variable, local or static
+        StringRef var_name = name_ids[0];
+        local_var_index = find_function_variable(symbols, func_index, &var_name);
+        if (local_var_index == -1) {
+            static_var_index = find_static_variable(symbols, &var_name);
+            if (static_var_index == -1) {
+                STRINGREF_TO_CSTR1(&var_name, 512);
+                PANIC("No variable, local or static, named '%s'\n", cstr1);
+            }
+        }
     }
 
     next_token = match(t_equals, tokens, next_token, indent);
@@ -450,7 +464,7 @@ int function_statement_assignment(Token *tokens, int next_token, SymbolTable *sy
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
-int function_statement_if(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
+int function_statement_if(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- If:\n");
     next_token = match(t_if, tokens, next_token, indent);
     next_token = match(t_leftparen, tokens, next_token, indent);
@@ -460,7 +474,7 @@ int function_statement_if(Token *tokens, int next_token, SymbolTable *symbols, i
 
     while (tokens[next_token].type != t_rightbrace) {
         // any number of function statements
-        next_token = function_statement(tokens, next_token, symbols, indent);
+        next_token = function_statement(tokens, next_token, symbols, func_index, indent);
     }
 
     next_token = match(t_rightbrace, tokens, next_token, indent);
@@ -471,7 +485,7 @@ int function_statement_if(Token *tokens, int next_token, SymbolTable *symbols, i
 
         while (tokens[next_token].type != t_rightbrace) {
             // any number of function statements
-            next_token = function_statement(tokens, next_token, symbols, indent);
+            next_token = function_statement(tokens, next_token, symbols, func_index, indent);
         }
 
         next_token = match(t_rightbrace, tokens, next_token, indent);
@@ -479,53 +493,62 @@ int function_statement_if(Token *tokens, int next_token, SymbolTable *symbols, i
 
     return next_token;
 }
-int function_statement_local_var(Token *tokens, int next_token, int indent) {
+int function_statement_local_var(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- LocalVariable:\n");
-    next_token = match(t_inttype, tokens, next_token, indent);
-    next_token = match(t_id, tokens, next_token, indent);
+    Variable var;
+
+    next_token = match_inttype(tokens, next_token, &var.int_type, indent);
+    next_token = match_id(tokens, next_token, &var.name, indent);
     next_token = match(t_equals, tokens, next_token, indent);
-    next_token = match(t_intliteral, tokens, next_token, indent);
+    next_token = match_intliteral(tokens, next_token, &var.initial_value, indent);
     next_token = match(t_semicolon, tokens, next_token, indent);
+
+    int var_index = add_function_variable(symbols, var);
+    if (symbols->functions[func_index].func_vars_index == -1) {
+        symbols->functions[func_index].func_vars_index = var_index;
+    }
+    symbols->functions[func_index].func_vars_len++;
+
     return next_token;
 }
-int function_statement_for_loop(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
+int function_statement_for_loop(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ForLoop:\n");
     next_token = match(t_for, tokens, next_token, indent);
     next_token = match(t_leftparen, tokens, next_token, indent);
 
-    next_token = function_statement(tokens, next_token, symbols, indent);
+    next_token = function_statement(tokens, next_token, symbols, func_index, indent);
 
     next_token = expression(tokens, next_token, symbols, indent);
     next_token = match(t_semicolon, tokens, next_token, indent);
 
-    next_token = function_statement(tokens, next_token, symbols, indent);
+    next_token = function_statement(tokens, next_token, symbols, func_index, indent);
 
     next_token = match(t_rightparen, tokens, next_token, indent);
     next_token = match(t_leftbrace, tokens, next_token, indent);
 
     while (tokens[next_token].type != t_rightbrace) {
         // any number of function statements
-        next_token = function_statement(tokens, next_token, symbols, indent);
+        next_token = function_statement(tokens, next_token, symbols, func_index, indent);
     }
 
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
 }
-int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
+int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     switch (tokens[next_token].type) {
         case t_for:
-            return function_statement_for_loop(tokens, next_token, symbols, indent);
+            return function_statement_for_loop(tokens, next_token, symbols, func_index, indent);
         case t_inttype:
-            return function_statement_local_var(tokens, next_token, indent);
+            return function_statement_local_var(tokens, next_token, symbols, func_index, indent);
         case t_if:
-            return function_statement_if(tokens, next_token, symbols, indent);
+            return function_statement_if(tokens, next_token, symbols, func_index, indent);
         case t_id:
             if (tokens[next_token+1].type == t_leftparen) {
                 next_token = function_call(tokens, next_token, symbols, indent);
                 next_token = match(t_semicolon, tokens, next_token, indent);
                 return next_token;
             } else {
-                return function_statement_assignment(tokens, next_token, symbols, indent);
+                return function_statement_assignment(tokens, next_token, symbols, func_index, indent);
             }
         case t_return:
             return function_statement_return(tokens, next_token, symbols, indent);
@@ -543,24 +566,29 @@ int function_argument(Token *tokens, int next_token, FunctionArg *fa, int indent
 int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Function:\n");
     Function func;
+    func.func_vars_index = -1;
+    func.func_vars_len = 0;
 
     next_token = match(t_fun, tokens, next_token, indent);
     next_token = match_id(tokens, next_token, &func.name, indent);
     next_token = match(t_leftparen, tokens, next_token, indent);
 
-    func.func_args_index = -1;
-    func.func_args_len = 0;
+    int func_index = add_function(symbols, func);
+    Function *func_ref = &symbols->functions[func_index];
+
+    func_ref->func_args_index = -1;
+    func_ref->func_args_len = 0;
     int fa_index = 0;
     while (tokens[next_token].type != t_rightparen) {
         // any number of args
         FunctionArg fa;
         next_token = function_argument(tokens, next_token, &fa, indent);
         fa_index = add_function_arg(symbols, fa);
-        if (func.func_args_index == -1) {
+        if (func_ref->func_args_index == -1) {
             // first one
-            func.func_args_index = fa_index;
+            func_ref->func_args_index = fa_index;
         }
-        func.func_args_len++;
+        func_ref->func_args_len++;
 
         if (tokens[next_token].type == t_rightparen) {
             break;
@@ -572,44 +600,70 @@ int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
 
     // optional return type
     if (tokens[next_token].type == t_colon) {
-        func.returns = true;
+        func_ref->returns = true;
         next_token = match(t_colon, tokens, next_token, indent);
         next_token = match_inttype(tokens, next_token, &func.return_type, indent);
     } else {
-        func.returns = false;
+        func_ref->returns = false;
     }
 
     next_token = match(t_leftbrace, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightbrace) {
         // any number of function statements
-        next_token = function_statement(tokens, next_token, symbols, indent);
+        next_token = function_statement(tokens, next_token, symbols, func_index, indent);
     }
     next_token = match(t_rightbrace, tokens, next_token, indent);
 
-    add_function(symbols, func);
     return next_token;
 }
 
-int static_var(Token *tokens, int next_token, int indent) {
+int static_var(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- StaticVariable:\n");
+    Variable var;
+
     next_token = match(t_static, tokens, next_token, indent);
-    next_token = match(t_inttype, tokens, next_token, indent);
-    next_token = match(t_id, tokens, next_token, indent);
+    next_token = match_inttype(tokens, next_token, &var.int_type, indent);
+    next_token = match_id(tokens, next_token, &var.name, indent);
     next_token = match(t_equals, tokens, next_token, indent);
-    next_token = match(t_intliteral, tokens, next_token, indent);
+    next_token = match_intliteral(tokens, next_token, &var.initial_value, indent);
     next_token = match(t_semicolon, tokens, next_token, indent);
+
+    add_static_variable(symbols, var);
     return next_token;
 }
 
 int on_interrupt(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- OnInterrupt:\n");
     next_token = match(t_on_interrupt, tokens, next_token, indent);
-    // TODO actually process
-    next_token = match(t_id, tokens, next_token, indent);
+
+    StringRef mmp_name;
+    next_token = match_id(tokens, next_token, &mmp_name, indent);
+    int mmp_index = find_mmp_index(symbols, &mmp_name);
+    if (mmp_index == -1) {
+        STRINGREF_TO_CSTR1(&mmp_name, 512);
+        PANIC("Cannot set interrupt handler for undefined MemoryMappedPeripheral: %s\n", cstr1);
+    }
+    if (symbols->mmps[mmp_index].interrupt_number == -1) {
+        STRINGREF_TO_CSTR1(&mmp_name, 512);
+        PANIC("Cannot set interrupt handler for '%s' - no interrupt number defined\n", cstr1);
+    }
+
+    InterruptHandler handler;
+    handler.interrupt_number = symbols->mmps[mmp_index].interrupt_number;
+
+    Function func;
+    func.func_args_index = -1;
+    func.func_args_len = 0;
+    func.returns = false;
+    func.name.str = "_____interrupt_handler";
+    func.name.len = 22;
+
+    int func_index = add_function(symbols, func);
+
     next_token = match(t_leftbrace, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightbrace) {
         // any number of function statements
-        next_token = function_statement(tokens, next_token, symbols, indent);
+        next_token = function_statement(tokens, next_token, symbols, func_index, indent);
     }
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
@@ -624,7 +678,7 @@ int root_statement(Token *tokens, int next_token, SymbolTable *symbols) {
         case t_fun:
             return function(tokens, next_token, symbols, 0);
         case t_static:
-            return static_var(tokens, next_token, 0);
+            return static_var(tokens, next_token, symbols, 0);
         case t_on_interrupt:
             return on_interrupt(tokens, next_token, symbols, 0);
         default:
