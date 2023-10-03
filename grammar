@@ -1,9 +1,0 @@
-stmt -> name = expr ;
-stmt -> if ( expr ) { stmt } ;
-stmt -> while ( expr ) { stmt } ;
-
-name -> id.name | id
-
-call -> id(optparams)
-optparams -> params | e
-params -> params, param | param

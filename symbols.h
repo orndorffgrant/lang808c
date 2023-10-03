@@ -115,6 +115,7 @@ int find_struct_item_index(SymbolTable *symbols, int mmp_index, StringRef *name)
 int find_bitfield_item_index(SymbolTable *symbols, int si_index, StringRef *name);
 int find_bitenum_item_index(SymbolTable *symbols, int bfi_index, StringRef *name);
 int find_function_index(SymbolTable *symbols, StringRef *name);
+int find_function_arg(SymbolTable *symbols, int func_index, StringRef *name);
 int find_function_variable(SymbolTable *symbols, int func_index, StringRef *name);
 int find_static_variable(SymbolTable *symbols, StringRef *name);
 

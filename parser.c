@@ -46,20 +46,65 @@ int match_id(Token *tokens, int next_token, StringRef *dest, int indent) {
     return match(t_id, tokens, next_token, indent);
 }
 
-int name(Token *tokens, int next_token, int max, StringRef *dests, int *num_read, int indent) {
-    int i = 1;
+enum name_result {
+    name_mmp_struct_item,
+    name_func_arg,
+    name_local_var,
+    name_static_var
+};
+struct NameResolutionResult {
+    enum name_result result;
+    int mmp_index;
+    int si_index;
+    int func_arg_index;
+    int local_var_index;
+    int static_var_index;
+};
+int name(Token *tokens, int next_token, SymbolTable *symbols, int func_index, struct NameResolutionResult *result, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Name:\n");
-    next_token = match_id(tokens, next_token, &dests[0], indent);
-    while (tokens[next_token].type == t_dot && i < max) {
+    StringRef first_name;
+    StringRef second_name;
+    next_token = match_id(tokens, next_token, &first_name, indent);
+    if (tokens[next_token].type == t_dot) {
+        // Must be field on an MMP
         next_token = match(t_dot, tokens, next_token, indent);
-        next_token = match_id(tokens, next_token, &dests[i], indent);
-        i++;
+        next_token = match_id(tokens, next_token, &second_name, indent);
+        result->mmp_index = find_mmp_index(symbols, &first_name);
+        if (result->mmp_index == -1) {
+            STRINGREF_TO_CSTR1(&first_name, 512);
+            PANIC("Reference to undefined MemoryMappedPeripheral: '%s'\n", cstr1);
+        }
+        result->si_index = find_struct_item_index(symbols, result->mmp_index, &second_name);
+        if (result->si_index == -1) {
+            STRINGREF_TO_CSTR1(&second_name, 512);
+            STRINGREF_TO_CSTR2(&first_name, 512);
+            PANIC("Field '%s' does not exist in '%s'\n", cstr1, cstr2);
+        }
+        result->result = name_mmp_struct_item;
+        return next_token;
+    } else {
+        // must be a variable, local or static
+        result->func_arg_index = find_function_arg(symbols, func_index, &first_name);
+        if (result->func_arg_index > -1) {
+            result->result = name_func_arg;
+            return next_token;
+        } 
+        result->local_var_index = find_function_variable(symbols, func_index, &first_name);
+        if (result->local_var_index > -1) {
+            result->result = name_local_var;
+            return next_token;
+        } 
+        result->static_var_index = find_static_variable(symbols, &first_name);
+        if (result->static_var_index == -1) {
+            STRINGREF_TO_CSTR1(&first_name, 512);
+            PANIC("No variable, arg or local or static, named '%s'\n", cstr1);
+        }
+        result->result = name_static_var;
+        return next_token;
     }
-    *num_read = i;
-    return next_token;
 }
 
-int expression(Token *tokens, int next_token, SymbolTable *symbols, int indent);
+int expression(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent);
 
 int function_call(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- FunctionCall:\n");
@@ -73,7 +118,7 @@ int function_call(Token *tokens, int next_token, SymbolTable *symbols, int inden
     int num_args = 0;
     next_token = match(t_leftparen, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightparen) {
-        next_token = expression(tokens, next_token, symbols, indent);
+        next_token = expression(tokens, next_token, symbols, func_index, indent);
         num_args++;
         if (tokens[next_token].type != t_rightparen) {
             next_token = match(t_comma, tokens, next_token, indent);
@@ -87,38 +132,19 @@ int function_call(Token *tokens, int next_token, SymbolTable *symbols, int inden
     next_token = match(t_rightparen, tokens, next_token, indent);
     return next_token;
 }
-int expression_term(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
+int expression_term(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ExpressionTerm:\n");
     if (tokens[next_token].type == t_intliteral) {
         next_token = match(t_intliteral, tokens, next_token, indent);
     } else {
-        StringRef name_ids[2];
-        int num_names;
-        int mmp_index = -1;
-        int si_index = -1;
-        next_token = name(tokens, next_token, 2, name_ids, &num_names, indent);
-        if (num_names == 2) {
-            // Must be field on an MMP
-            StringRef mmp_name = name_ids[0];
-            StringRef struct_item_name = name_ids[1];
-            mmp_index = find_mmp_index(symbols, &mmp_name);
-            if (mmp_index == -1) {
-                STRINGREF_TO_CSTR1(&mmp_name, 512);
-                PANIC("Cannot initialize undefined MemoryMappedPeripheral: %s\n", cstr1);
-            }
-            si_index = find_struct_item_index(symbols, mmp_index, &struct_item_name);
-            if (si_index == -1) {
-                STRINGREF_TO_CSTR1(&struct_item_name, 512);
-                STRINGREF_TO_CSTR2(&symbols->mmps[mmp_index].name, 512);
-                PANIC("Field '%s' does not exist in '%s'\n", cstr1, cstr2);
-            }
-        }
+        struct NameResolutionResult name_result;
+        next_token = name(tokens, next_token, symbols, func_index, &name_result, indent);
     }
     return next_token;
 }
-int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
+int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ShiftExpression:\n");
-    next_token = expression_term(tokens, next_token, symbols, indent);
+    next_token = expression_term(tokens, next_token, symbols, func_index, indent);
     switch (tokens[next_token].type) {
         case t_shiftleft:
             next_token = match(t_shiftleft, tokens, next_token, indent);
@@ -126,12 +152,12 @@ int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int in
         default:
             return next_token;
     }
-    next_token = expression_term(tokens, next_token, symbols, indent);
+    next_token = expression_term(tokens, next_token, symbols, func_index, indent);
     return next_token;
 }
-int expression_bit(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
+int expression_bit(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitExpression:\n");
-    next_token = expression_shift(tokens, next_token, symbols, indent);
+    next_token = expression_shift(tokens, next_token, symbols, func_index, indent);
     switch (tokens[next_token].type) {
         case t_and:
             next_token = match(t_and, tokens, next_token, indent);
@@ -139,12 +165,12 @@ int expression_bit(Token *tokens, int next_token, SymbolTable *symbols, int inde
         default:
             return next_token;
     }
-    next_token = expression_shift(tokens, next_token, symbols, indent);
+    next_token = expression_shift(tokens, next_token, symbols, func_index, indent);
     return next_token;
 }
-int expression_sum(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
+int expression_sum(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- SumExpression:\n");
-    next_token = expression_bit(tokens, next_token, symbols, indent);
+    next_token = expression_bit(tokens, next_token, symbols, func_index, indent);
     switch (tokens[next_token].type) {
         case t_plus:
             next_token = match(t_plus, tokens, next_token, indent);
@@ -155,13 +181,13 @@ int expression_sum(Token *tokens, int next_token, SymbolTable *symbols, int inde
         default:
             return next_token;
     }
-    next_token = expression_bit(tokens, next_token, symbols, indent);
+    next_token = expression_bit(tokens, next_token, symbols, func_index, indent);
     return next_token;
 }
-int expression(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
+int expression(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     // top level expression is comparison
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Expression:\n");
-    next_token = expression_sum(tokens, next_token, symbols, indent);
+    next_token = expression_sum(tokens, next_token, symbols, func_index, indent);
     switch (tokens[next_token].type) {
         case t_equalsequals:
             next_token = match(t_equalsequals, tokens, next_token, indent);
@@ -172,7 +198,7 @@ int expression(Token *tokens, int next_token, SymbolTable *symbols, int indent) 
         default:
             return next_token;
     }
-    next_token = expression_sum(tokens, next_token, symbols, indent);
+    next_token = expression_sum(tokens, next_token, symbols, func_index, indent);
     return next_token;
 }
 
@@ -406,60 +432,32 @@ int initialize(Token *tokens, int next_token, SymbolTable *symbols, int indent) 
 
 int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent);
 
-int function_statement_return(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
+int function_statement_return(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Return:\n");
     next_token = match(t_return, tokens, next_token, indent);
-    next_token = expression(tokens, next_token, symbols, indent);
+    next_token = expression(tokens, next_token, symbols, func_index, indent);
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
 int function_statement_assignment(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Assignment:\n");
-    // TODO support static vars and local vars
-    StringRef name_ids[2];
-    int num_names;
-    int mmp_index = -1;
-    int si_index = -1;
-    int static_var_index = -1;
-    int local_var_index = -1;
-    next_token = name(tokens, next_token, 2, name_ids, &num_names, indent);
-    if (num_names == 2) {
-        // Must be field on an MMP
-        StringRef mmp_name = name_ids[0];
-        StringRef struct_item_name = name_ids[1];
-        mmp_index = find_mmp_index(symbols, &mmp_name);
-        if (mmp_index == -1) {
-            STRINGREF_TO_CSTR1(&mmp_name, 512);
-            PANIC("Cannot initialize undefined MemoryMappedPeripheral: %s\n", cstr1);
-        }
-        si_index = find_struct_item_index(symbols, mmp_index, &struct_item_name);
-        if (si_index == -1) {
-            STRINGREF_TO_CSTR1(&struct_item_name, 512);
-            STRINGREF_TO_CSTR2(&symbols->mmps[mmp_index].name, 512);
-            PANIC("Field '%s' does not exist in '%s'\n", cstr1, cstr2);
-        }
-    } else {
-        // TODO I think the provlem is here
-        // must be a variable, local or static
-        StringRef var_name = name_ids[0];
-        local_var_index = find_function_variable(symbols, func_index, &var_name);
-        if (local_var_index == -1) {
-            static_var_index = find_static_variable(symbols, &var_name);
-            if (static_var_index == -1) {
-                STRINGREF_TO_CSTR1(&var_name, 512);
-                PANIC("No variable, local or static, named '%s'\n", cstr1);
-            }
-        }
-    }
+    struct NameResolutionResult name_result;
+    next_token = name(tokens, next_token, symbols, func_index, &name_result, indent);
 
     next_token = match(t_equals, tokens, next_token, indent);
-    if (tokens[next_token].type == t_id && tokens[next_token + 1].type == t_leftparen) {
-        next_token = function_call(tokens, next_token, symbols, indent);
-    } else if (tokens[next_token].type == t_leftbrace) {
-        // TODO
-        next_token = bitfield_value(tokens, next_token, symbols, si_index, indent);
+    if (name_result.result == name_mmp_struct_item) {
+        if (symbols->struct_items[name_result.si_index].type == si_bf) {
+            next_token = bitfield_value(tokens, next_token, symbols, name_result.si_index, indent);
+        } else {
+            next_token = expression(tokens, next_token, symbols, func_index, indent);
+        }
     } else {
-        next_token = expression(tokens, next_token, symbols, indent);
+        // local or static variable
+        if (tokens[next_token].type == t_id && tokens[next_token + 1].type == t_leftparen) {
+            next_token = function_call(tokens, next_token, symbols, indent);
+        } else {
+            next_token = expression(tokens, next_token, symbols, func_index, indent);
+        }
     }
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
@@ -468,7 +466,7 @@ int function_statement_if(Token *tokens, int next_token, SymbolTable *symbols, i
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- If:\n");
     next_token = match(t_if, tokens, next_token, indent);
     next_token = match(t_leftparen, tokens, next_token, indent);
-    next_token = expression(tokens, next_token, symbols, indent);
+    next_token = expression(tokens, next_token, symbols, func_index, indent);
     next_token = match(t_rightparen, tokens, next_token, indent);
     next_token = match(t_leftbrace, tokens, next_token, indent);
 
@@ -518,7 +516,7 @@ int function_statement_for_loop(Token *tokens, int next_token, SymbolTable *symb
 
     next_token = function_statement(tokens, next_token, symbols, func_index, indent);
 
-    next_token = expression(tokens, next_token, symbols, indent);
+    next_token = expression(tokens, next_token, symbols, func_index, indent);
     next_token = match(t_semicolon, tokens, next_token, indent);
 
     next_token = function_statement(tokens, next_token, symbols, func_index, indent);
@@ -551,7 +549,7 @@ int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int 
                 return function_statement_assignment(tokens, next_token, symbols, func_index, indent);
             }
         case t_return:
-            return function_statement_return(tokens, next_token, symbols, indent);
+            return function_statement_return(tokens, next_token, symbols, func_index, indent);
         default:
             PANIC("invalid token at beginning of function statement\n");
     }
@@ -654,6 +652,8 @@ int on_interrupt(Token *tokens, int next_token, SymbolTable *symbols, int indent
     Function func;
     func.func_args_index = -1;
     func.func_args_len = 0;
+    func.func_vars_index = -1;
+    func.func_vars_len = 0;
     func.returns = false;
     func.name.str = "_____interrupt_handler";
     func.name.len = 22;
