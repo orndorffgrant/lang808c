@@ -686,7 +686,7 @@ int root_statement(Token *tokens, int next_token, SymbolTable *symbols) {
     }
 }
 
-int parse(Token *tokens, int token_num, SymbolTable *symbols) {
+void parse(Token *tokens, int token_num, SymbolTable *symbols) {
     int next_token = 0;
     while (next_token < token_num) {
         next_token = root_statement(tokens, next_token, symbols);
