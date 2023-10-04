@@ -3,42 +3,58 @@
 
 #include "common.h"
 
+// An enum for the different supported integer types
 typedef enum {
     int_u8,
     int_u16,
     int_u32
 } IntType;
 
+// A struct representing one item in a BitEnum. e.g. "value = 4;"
 typedef struct _BitEnumItem {
     StringRef name;
     int value;
 } BitEnumItem;
+
+// A struct representing a BitEnum.
+// It references its values by indexes into the array of BitEnumItems in the SymbolTable.
 typedef struct _BitEnum {
     int width;
     int be_items_index;
     int be_items_len;
 } BitEnum;
+
+// An enum for the different types of sub-fields allowed in a BitField
 typedef enum {
     bfi_int,
     bfi_enum,
     bfi_unused
 } BitFieldItemType;
+
+// A struct representing one item in a BitField. e.g. "sub_field: 2;"
 typedef struct _BitFieldItem {
     BitFieldItemType type;
     StringRef name;
     int width;
     BitEnum be;
 } BitFieldItem;
+
+// A struct representing a BitField.
+// It references its sub-fields by indexes into the array of BitFieldItems in the SymbolTable.
 typedef struct _BitField {
     int width;
     int bf_items_index;
     int bf_items_len;
 } BitField;
+
+// An enum for the different types of fields allowed in a MemoryMappedPeripheral struct
 typedef enum {
     si_int,
     si_bf,
     si_unused
 } StructItemType;
+
+// A struct representing one item in a MemoryMappedPeripheral struct. e.g. "field: u16;"
 typedef struct _StructItem {
     // TODO add address
     StructItemType type;
@@ -46,6 +62,9 @@ typedef struct _StructItem {
     IntType int_type;
     BitField bf;
 } StructItem;
+
+// A struct representing a MemoryMappedPeripheral.
+// It references its fields by indexes into the array of StructItems in the SymbolTable.
 typedef struct _MemoryMappedPeripheral {
     StringRef name;
     int base_address;
@@ -54,16 +73,22 @@ typedef struct _MemoryMappedPeripheral {
     int struct_items_len;
 } MemoryMappedPeripheral;
 
+// A struct representing a variable, static or local
 typedef struct _Variable {
     StringRef name;
     IntType int_type;
     int initial_value;
 } Variable;
 
+// A struct representing one argument to a function
 typedef struct _FunctionArg {
     StringRef name;
     IntType int_type;
 } FunctionArg;
+
+// A struct representing one function
+// It references its arguments by indexes into the array of FunctionArgs in the SymbolTable.
+// It references its local variables by indexes into the array of local Variables in the SymbolTable.
 typedef struct _Function {
     StringRef name;
     int func_args_index;
@@ -73,11 +98,15 @@ typedef struct _Function {
     bool returns;
     IntType return_type;
 } Function;
+
+// A struct representing an interrupt handler
+// It references its function by an index into the array of Functions in the SymbolTable.
 typedef struct _InterruptHandler {
     int interrupt_number;
     int func_index;
 } InterruptHandler;
 
+// All types of symbols are kept in flat arrays
 typedef struct _SymbolTable {
     MemoryMappedPeripheral mmps[1024];
     int mmps_num;
@@ -100,6 +129,9 @@ typedef struct _SymbolTable {
     InterruptHandler interrupt_handlers[1024];
     int interrupt_handlers_num;
 } SymbolTable;
+
+
+// These helper functions are defined in symbols.c
 
 int add_mmp(SymbolTable *symbols, MemoryMappedPeripheral item);
 int add_struct_item(SymbolTable *symbols, StructItem item);

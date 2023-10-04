@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "symbols.h"
 
+// Some helper macros for printing the parse tree
 #ifndef PRINT_PARSE_TREE
 #define PRINT_PARSE_TREE 1
 #endif

@@ -3,6 +3,8 @@
 #include "symbols.h"
 #include "common.h"
 
+
+// These are helpers to add items to each of the arrays in the SymbolTable
 int add_mmp(SymbolTable *symbols, MemoryMappedPeripheral item) {
   symbols->mmps[symbols->mmps_num] = item;
   return symbols->mmps_num++;
@@ -36,6 +38,9 @@ int add_function_variable(SymbolTable *symbols, Variable item) {
   return symbols->function_vars_num++;
 }
 
+
+// These are helpers to find items by name (StringRef) in each of the arrays in the SymbolTable
+// They all return -1 if an item with the given name cannot be found
 int find_mmp_index(SymbolTable *symbols, StringRef *name) {
     for (int i = 0; i < symbols->mmps_num; i++) {
         if (string_ref_eq(name, &symbols->mmps[i].name)) {
@@ -86,7 +91,6 @@ int find_bitenum_item_index(SymbolTable *symbols, int bfi_index, StringRef *name
     }
     return -1;
 }
-
 int find_function_index(SymbolTable *symbols, StringRef *name) {
     for (int i = 0; i < symbols->functions_num; i++) {
         if (string_ref_eq(name, &symbols->functions[i].name)) {
@@ -123,7 +127,6 @@ int find_function_variable(SymbolTable *symbols, int func_index, StringRef *name
     }
     return -1;
 }
-
 int find_static_variable(SymbolTable *symbols, StringRef *name) {
     for (int i = 0; i < symbols->static_vars_num; i++) {
         if (string_ref_eq(name, &symbols->static_vars[i].name)) {
