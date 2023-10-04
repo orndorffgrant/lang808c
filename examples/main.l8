@@ -223,7 +223,7 @@ initialize PortB {
 # Here we define the initial values of the GCLK registers
 # Note that these will be set in order from top to bottom
 # This sets the internal 32khz clock to drive "GCLK 4"
-$ Then this sets "GCLK 4" to drive the the RealTimeClock peripheral
+# Then this sets "GCLK 4" to drive the the RealTimeClock peripheral
 # You can find the directions for configuring this peripheral in the datasheet for the SAMD21
 initialize GCLK {
     gendiv = {
