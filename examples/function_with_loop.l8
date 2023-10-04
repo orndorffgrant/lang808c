@@ -1,5 +1,5 @@
-# This is just an example Lang808 snippet for demonstrating a portion of the compiler
-# It does not do anything meaningful
+# This is just an example Lang808 snippet for demonstrating a portion of the compiler.
+# It does not do anything meaningful.
 
 # It accepts one argument: "times"
 fun calculate_value(times: u32): u32 {

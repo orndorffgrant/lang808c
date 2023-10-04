@@ -1,9 +1,18 @@
+// This file contains the implementation of the Lang808 parser
+// The entrypoint of the parser is the "parse" function defined at the bottom of this file.
+// The parser is a predictive recursive descent parser, which uses the call stack as it's implicit parse tree.
+// The tree is printed as the parser traverses the tree, in yaml format.
+// Each function "consumes" part of the Token list by accepting a "next_token" argument, incrementing it
+// as it parses tokens, and then returning the index to the next token that it hasn't yet parsed.
+// Most functions take a reference the SymbolTable and add or reference entries as appropriate.
+
 #include "parser.h"
 #include "common.h"
 #include "lexer.h"
 #include "symbols.h"
 
 
+// This asserts that the next token is what we expect and then increments next_token
 int match(TokenType token_type, Token *tokens, int next_token, int indent) {
     if (tokens[next_token].type != token_type) {
         PANIC(
@@ -16,6 +25,8 @@ int match(TokenType token_type, Token *tokens, int next_token, int indent) {
     PARSE_TREE_INDENT(indent); PARSE_TREE_PRINT("- %s\n", token_str);
     return next_token + 1;
 }
+
+// parse an inttype token, putting the IntType enum into dest
 int match_inttype(Token *tokens, int next_token, IntType *dest, int indent) {
     Token t = tokens[next_token];
     if (t.type == t_inttype) {
@@ -31,6 +42,7 @@ int match_inttype(Token *tokens, int next_token, IntType *dest, int indent) {
     }
     return match(t_inttype, tokens, next_token, indent);
 }
+// parse an intliteral token, putting the literal value into dest
 int match_intliteral(Token *tokens, int next_token, int *dest, int indent) {
     Token t = tokens[next_token];
     if (t.type == t_intliteral) {
@@ -38,6 +50,7 @@ int match_intliteral(Token *tokens, int next_token, int *dest, int indent) {
     }
     return match(t_intliteral, tokens, next_token, indent);
 }
+// parse an id token, putting the string value into dest
 int match_id(Token *tokens, int next_token, StringRef *dest, int indent) {
     Token t = tokens[next_token];
     if (t.type == t_id) {
@@ -60,6 +73,8 @@ struct NameResolutionResult {
     int local_var_index;
     int static_var_index;
 };
+// parse a "Name" which can be "id" if its a variable, or "id.id" if its a field on a peripheral
+// Check that the variable/peripheral reference is valid and detect which it is
 int name(Token *tokens, int next_token, SymbolTable *symbols, int func_index, struct NameResolutionResult *result, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Name:\n");
     StringRef first_name;
@@ -106,6 +121,8 @@ int name(Token *tokens, int next_token, SymbolTable *symbols, int func_index, st
 
 int expression(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent);
 
+// parse a function call e.g. "function_name(arg1, arg2)"
+// checks that the function exists and that the correct number of arguments are passed
 int function_call(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- FunctionCall:\n");
     StringRef func_name;
@@ -132,6 +149,7 @@ int function_call(Token *tokens, int next_token, SymbolTable *symbols, int inden
     next_token = match(t_rightparen, tokens, next_token, indent);
     return next_token;
 }
+// terminal in an expression, either an int literal or a "name"
 int expression_term(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ExpressionTerm:\n");
     if (tokens[next_token].type == t_intliteral) {
@@ -142,6 +160,7 @@ int expression_term(Token *tokens, int next_token, SymbolTable *symbols, int fun
     }
     return next_token;
 }
+// parse a shift expression e.g. "1 << 30"
 int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ShiftExpression:\n");
     next_token = expression_term(tokens, next_token, symbols, func_index, indent);
@@ -155,6 +174,7 @@ int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int fu
     next_token = expression_term(tokens, next_token, symbols, func_index, indent);
     return next_token;
 }
+// parse a bitwise operation expression e.g. "1 & 30"
 int expression_bit(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitExpression:\n");
     next_token = expression_shift(tokens, next_token, symbols, func_index, indent);
@@ -168,6 +188,7 @@ int expression_bit(Token *tokens, int next_token, SymbolTable *symbols, int func
     next_token = expression_shift(tokens, next_token, symbols, func_index, indent);
     return next_token;
 }
+// parse an addition or subtraction operation expression e.g. "1 - 30"
 int expression_sum(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- SumExpression:\n");
     next_token = expression_bit(tokens, next_token, symbols, func_index, indent);
@@ -184,6 +205,7 @@ int expression_sum(Token *tokens, int next_token, SymbolTable *symbols, int func
     next_token = expression_bit(tokens, next_token, symbols, func_index, indent);
     return next_token;
 }
+// parse a comparison expression e.g. "1 > 30"
 int expression(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     // top level expression is comparison
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Expression:\n");
@@ -202,6 +224,10 @@ int expression(Token *tokens, int next_token, SymbolTable *symbols, int func_ind
     return next_token;
 }
 
+// parse a value being assigned to an item that is a BitField
+// e.g. { val = 4; val2 = 6; val3 = enum_name }
+// check that the fields in the bitfield exist
+// check that enum names used for a particular field exist
 int bitfield_value(Token *tokens, int next_token, SymbolTable *symbols, int si_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitFieldValue:\n");
     next_token = match(t_leftbrace, tokens, next_token, indent);
@@ -239,6 +265,8 @@ int bitfield_value(Token *tokens, int next_token, SymbolTable *symbols, int si_i
     return next_token;
 }
 
+// parse an item definition of a BitEnum e.g. "clock4 = 0x4;"
+// put name and value of enum item into *bei
 int mmp_def_structure_item_bf_item_enum_item(Token *tokens, int next_token, BitEnumItem *bei, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitEnumItem:\n");
     next_token = match_id(tokens, next_token, &bei->name, indent);
@@ -247,6 +275,8 @@ int mmp_def_structure_item_bf_item_enum_item(Token *tokens, int next_token, BitE
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
+// parse a BitEnum definition e.g. "BitEnum5 { clock4 = 0x4; }"
+// add bit enum items to symbol table and link *be to those items
 int mmp_def_structure_item_bf_item_enum(Token *tokens, int next_token, SymbolTable *symbols, BitEnum *be, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitEnum:\n");
     next_token = match(t_be, tokens, next_token, indent);
@@ -270,6 +300,8 @@ int mmp_def_structure_item_bf_item_enum(Token *tokens, int next_token, SymbolTab
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
 }
+// parse an item definition within a BitField e.g. "clock_id: 32;"
+// put name and type into *bf
 int mmp_def_structure_item_bf_item(Token *tokens, int next_token, SymbolTable *symbols, BitFieldItem *bfi, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitFieldItem:\n");
     bfi->type = bfi_int;
@@ -289,6 +321,8 @@ int mmp_def_structure_item_bf_item(Token *tokens, int next_token, SymbolTable *s
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
+// parse a BitField e.g. "BitField32 { clock_id: 32; }"
+// add BitField items to symbol table and link *si to those items
 int mmp_def_structure_item_bf(Token *tokens, int next_token, SymbolTable *symbols, StructItem *si, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitField:\n");
     Token t = tokens[next_token];
@@ -316,6 +350,8 @@ int mmp_def_structure_item_bf(Token *tokens, int next_token, SymbolTable *symbol
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
 }
+// parse a StructItem of a MemoryMappedPeripheral e.g. "field: u32;"
+// put name and type into *si
 int mmp_def_structure_item(Token *tokens, int next_token, SymbolTable *symbols, StructItem *si, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- StructureItem:\n");
     if (tokens[next_token].type == t_id) {
@@ -337,6 +373,8 @@ int mmp_def_structure_item(Token *tokens, int next_token, SymbolTable *symbols, 
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
+// parse a Structure for a peripheral e.g. "{ field: u32; field2:u16 }"
+// add StructItems to symbol table and link *mmp to those items
 int mmp_def_structure(Token *tokens, int next_token, SymbolTable *symbols, MemoryMappedPeripheral *mmp, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Structure:\n");
     next_token = match(t_leftbrace, tokens, next_token, indent);
@@ -355,6 +393,8 @@ int mmp_def_structure(Token *tokens, int next_token, SymbolTable *symbols, Memor
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
 }
+// parse optional interrupt number for a peripheral, e.g. "!42"
+// put interrupt num, if present, in dest
 int mmp_def_opt_interrupt_num(Token *tokens, int next_token, int *dest, int indent) {
     if (tokens[next_token].type != t_bang) {
         PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- NoInterruptNum:\n");
@@ -366,12 +406,15 @@ int mmp_def_opt_interrupt_num(Token *tokens, int next_token, int *dest, int inde
     next_token = match_intliteral(tokens, next_token, dest, indent);
     return next_token;
 }
+// parse base address for a peripheral, e.g. "@0x40000000"
+// put base address in dest
 int mmp_def_base_address(Token *tokens, int next_token, int *dest, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BaseAddress:\n");
     next_token = match(t_at, tokens, next_token, indent);
     next_token = match_intliteral(tokens, next_token, dest, indent);
     return next_token;
 }
+// parse MemoryMappedPeripheral, e.g. "MemoryMappedPeripheral PeripheralName @0x40000000 !42 {}"
 int mmp_def(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- MemoryMappedPeripheral:\n");
     MemoryMappedPeripheral mmp;
@@ -385,6 +428,9 @@ int mmp_def(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     add_mmp(symbols, mmp);
     return next_token;
 }
+
+// parse a statement inside an initialize block
+// check that the fields and values are valid for the peripheral being initialized
 int initialize_statement(Token *tokens, int next_token, SymbolTable *symbols, int mmp_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- InitializeStatement:\n");
     StringRef struct_item_name;
@@ -409,6 +455,8 @@ int initialize_statement(Token *tokens, int next_token, SymbolTable *symbols, in
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
+// parse an initialize block
+// check that the peripheral name is valid
 int initialize(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Initialize:\n");
     next_token = match(t_initialize, tokens, next_token, indent);
@@ -432,6 +480,7 @@ int initialize(Token *tokens, int next_token, SymbolTable *symbols, int indent) 
 
 int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent);
 
+// parse return statement, e.g. "return 5 + var;"
 int function_statement_return(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Return:\n");
     next_token = match(t_return, tokens, next_token, indent);
@@ -439,6 +488,8 @@ int function_statement_return(Token *tokens, int next_token, SymbolTable *symbol
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
+// parse assignment statement, e.g. "var = 5 + var;"
+// check that the variable being assigned to is valid
 int function_statement_assignment(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Assignment:\n");
     struct NameResolutionResult name_result;
@@ -462,6 +513,8 @@ int function_statement_assignment(Token *tokens, int next_token, SymbolTable *sy
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
+// parse an if-else statement, e.g. "if (1) { x = 2 } else { x = 3 }"
+// "else" is optional
 int function_statement_if(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- If:\n");
     next_token = match(t_if, tokens, next_token, indent);
@@ -491,6 +544,9 @@ int function_statement_if(Token *tokens, int next_token, SymbolTable *symbols, i
 
     return next_token;
 }
+// parse local variable declaration, e.g. "u32 var = 4;"
+// initial value is required
+// puts the variable into the symbol table
 int function_statement_local_var(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- LocalVariable:\n");
     Variable var;
@@ -509,6 +565,7 @@ int function_statement_local_var(Token *tokens, int next_token, SymbolTable *sym
 
     return next_token;
 }
+// parse for-loop, e.g. "for (u32 i = 1; i < 10; i = i + 1) {}"
 int function_statement_for_loop(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ForLoop:\n");
     next_token = match(t_for, tokens, next_token, indent);
@@ -532,6 +589,7 @@ int function_statement_for_loop(Token *tokens, int next_token, SymbolTable *symb
     next_token = match(t_rightbrace, tokens, next_token, indent);
     return next_token;
 }
+// parse any function statement, lookahead at next token to determine which kind of statement it will be
 int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     switch (tokens[next_token].type) {
         case t_for:
@@ -554,6 +612,8 @@ int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int 
             PANIC("invalid token at beginning of function statement\n");
     }
 }
+// parse function argument definition
+// put the name and type into *fa
 int function_argument(Token *tokens, int next_token, FunctionArg *fa, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- FunctionArgument:\n");
     next_token = match_id(tokens, next_token, &fa->name, indent);
@@ -561,6 +621,8 @@ int function_argument(Token *tokens, int next_token, FunctionArg *fa, int indent
     next_token = match_inttype(tokens, next_token, &fa->int_type, indent);
     return next_token;
 }
+// parse a whole function
+// put the function name, argument references, and variable references into the symbol table
 int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Function:\n");
     Function func;
@@ -615,6 +677,8 @@ int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     return next_token;
 }
 
+// parse a static (global) variable, e.g "static u32 global = 45;"
+// put the variable in the symbol table
 int static_var(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- StaticVariable:\n");
     Variable var;
@@ -630,6 +694,9 @@ int static_var(Token *tokens, int next_token, SymbolTable *symbols, int indent) 
     return next_token;
 }
 
+// parse an on_interrupt block, e.g. "on_interrupt PeripheralName {}"
+// check that the peripheral exists and has an interrupt number defined
+// create a function with no arguments and parse the statements into that function
 int on_interrupt(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- OnInterrupt:\n");
     next_token = match(t_on_interrupt, tokens, next_token, indent);
@@ -669,6 +736,7 @@ int on_interrupt(Token *tokens, int next_token, SymbolTable *symbols, int indent
     return next_token;
 }
 
+// parse any top-level statement, lookahead at next token to determine which kind of statement it will be
 int root_statement(Token *tokens, int next_token, SymbolTable *symbols) {
     switch (tokens[next_token].type) {
         case t_mmp:
@@ -686,6 +754,8 @@ int root_statement(Token *tokens, int next_token, SymbolTable *symbols) {
     }
 }
 
+// The entry-point for the parser
+// calls root_statement until all tokens are parsed.
 void parse(Token *tokens, int token_num, SymbolTable *symbols) {
     int next_token = 0;
     while (next_token < token_num) {

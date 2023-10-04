@@ -1,3 +1,5 @@
+// This file contains the implementation of the Lang808 lexer
+// The entrypoint of the lexer is the "lex" function defined at the bottom of this file.
 
 #include <stdio.h>
 #include <stdbool.h>
