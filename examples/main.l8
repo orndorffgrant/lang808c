@@ -1,3 +1,7 @@
+# This is a REAL Lang808 program designed to run on the SAMD21 Xplained Pro Discovery Kit
+
+# Here we define the PortB peripheral
+# You can find the register definitions in the datasheet for the SAMD21
 MemoryMappedPeripheral PortB @0x41004480 {
     dir: u32;
     dirclr: u32;
@@ -27,6 +31,8 @@ MemoryMappedPeripheral PortB @0x41004480 {
     };
 }
 
+# Here we define the GCLK peripheral
+# You can find the register definitions in the datasheet for the SAMD21
 MemoryMappedPeripheral GCLK @0x40000C00 {
     ctrl: BitField8 {
         swrst: 1;
@@ -122,6 +128,8 @@ MemoryMappedPeripheral GCLK @0x40000C00 {
     };
 }
 
+# Here we define the RTCMode0 peripheral
+# You can find the register definitions in the datasheet for the SAMD21
 MemoryMappedPeripheral RTCMode0 @0x40000C00 !3 {
     ctrl: BitField16 {
         swrst: 1;
@@ -205,10 +213,18 @@ MemoryMappedPeripheral RTCMode0 @0x40000C00 !3 {
     comp0: u32;
 }
 
+# Here we define the initial values of the PortB registers
+# This sets the dir bit of pin 30 so that we can use it as output
+# Pin 30 is connected to the on-board LED
 initialize PortB {
     dir = 0x20000000; # 1 << 30
 }
 
+# Here we define the initial values of the GCLK registers
+# Note that these will be set in order from top to bottom
+# This sets the internal 32khz clock to drive "GCLK 4"
+$ Then this sets "GCLK 4" to drive the the RealTimeClock peripheral
+# You can find the directions for configuring this peripheral in the datasheet for the SAMD21
 initialize GCLK {
     gendiv = {
         id = 4;
@@ -226,6 +242,12 @@ initialize GCLK {
     };
 }
 
+# Here we define the initial values of the RTCMode0 registers
+# This sets it to be in "Count" mode and sets the interrupt to fire when the count
+# reaches 0x8000.
+# Since the we set a 32khz clock to drive the RTC, it will reach 0x8000 after 1 second.
+# We set "matchclr" so that the count will go back to zero and continue counting after
+# it reaches 0x8000.
 initialize RTCMode0 {
     count = 0x0;
     comp0 = 0x8000;
@@ -240,18 +262,29 @@ initialize RTCMode0 {
 }
 
 # This function just loops for a while to take up some time
+# The number of times it loops is passed via a function argument
 fun delay(delay_count: u32) {
     for (u32 i = 0; i < delay_count; i = i + 1;) {}
 }
 
+# This function takes no arguments. It sets the toggle bit of pin 30
+# in PortB, which is the pin connected to the LED.
+# Then it uses the "delay" function to wait for a bit before toggling
+# the LED again.
+# The overall affect is that this function quickly flashes the LED on
+# and then off.
 fun blinkLED() {
     PortB.outtgl = 1 << 30;
     delay(1000);
     PortB.outtgl = 1 << 30;
 }
 
+# This defines a static variable, which is a global variable at a static location in memory
+# Here, the variable is called "counting_up" and initialized to 1.
 static u32 counting_up = 1;
 
+# This function calls "blinkLED" the number of times passed as the argument.
+# Then it calculates the number of times we should blink next time the RTC interrupt is called.
 fun blink_and_update_blink_times(blink_times: u32): u32 {
     u32 new_blink_times = 0;
 
@@ -277,7 +310,6 @@ fun blink_and_update_blink_times(blink_times: u32): u32 {
 
 static u32 blink_times = 1;
 
-# This is a comment
 # on_interrupt keyword auto-enables interrupt in NVIC
 on_interrupt RTCMode0 {
 
@@ -296,4 +328,3 @@ on_interrupt RTCMode0 {
     };
     # end of on_interrupt auto-clears interrupt in NVIC
 }
-

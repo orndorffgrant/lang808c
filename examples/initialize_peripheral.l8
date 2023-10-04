@@ -1,18 +1,34 @@
+# This is just an example Lang808 snippet for demonstrating a portion of the compiler.
+# It does not do anything meaningful.
+
+# This defines a memory mapped peripheral called "PortB" with a base address of 0x041004480
+# The details of this peripheral are made-up for the sake of an example
 MemoryMappedPeripheral PortB @0x41004480 {
+  # These are registers of the peripheral and their sizes
   dir: u32;
   outtgl: u32;
+  # This register is special. It has many sub-fields inside of it, each of which is only a couple bits long
   config: BitField8 {
+    # For example, this field "pmuxen" is only 1 bit
     pmuxen: 1;
-    inen: 1;
-    pullen: 1;
-    $unused: 3;
-    drvstr: 1;
+    inen: 2;
+    pullen: 3;
+    # "$unused" is a special keyword that indicates these bits within the register are unused
     $unused: 1;
+    drvstr: 1;
   };
 }
+
+# The initialize keyword sets the initial values of the registers in a memory mapped peripheral
+# These values will be set first-thing in the final program
+# In this case, PortB is being initialized
 initialize PortB {
+  # fields that aren't mentioned here are not set
+  # The "dir" field will be set to 0x20000000
   dir = 0x20000000;
   config = {
-    pullen = 1;
+    # Here each sub-field for "config" can be specified individually
+    # sub-fields not mentioned here get set to 0
+    pullen = 5;
   };
 }
