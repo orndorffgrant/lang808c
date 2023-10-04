@@ -7,6 +7,9 @@
 
 #include "common.h"
 
+// These are some useful constants in lexing and define valid characters
+// for IDs as well as the characters that are considered "end" characters
+// of a lexeme in some circumstances.
 #define VALID_ID_CHARS_START "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
 #define VALID_ID_CHARS_START_LEN 53
 #define VALID_ID_CHARS "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
@@ -14,6 +17,7 @@
 #define DELIM_CHARS "\0\n =(){}:;.,"
 #define DELIM_CHARS_LEN 12
 
+// This is a helper to turn a "Token" (defined below) into a printable string
 #define CREATE_TOKEN_STRING(t) char lexeme[256];\
 char token_str[512];\
 strncpy(lexeme, t.lexeme.str, t.lexeme.len);\
@@ -21,10 +25,12 @@ lexeme[t.lexeme.len] = 0;\
 sprintf(token_str, "%s(%s,%lu)",\
 token_type_to_static_string(t.type), lexeme, t.int_value);
 
+// This is the enum of all available token types in Lang808
+// The top three are special sentinel values to help with the "lex" function
 typedef enum {
-    t_NONE = 0,
-    t_IGNORE,
-    t_INVALID,
+    t_NONE = 0, // specifies a StringRef has not yet successfully matched a token type
+    t_IGNORE, // used for comments and whitespace
+    t_INVALID, // used when a sequence of characters cannot possibly match any token type
 
     // punctuation
     t_equals,
@@ -70,12 +76,16 @@ typedef enum {
     t_intliteral,
 } TokenType;
 
+// A Token consists of its type, a StringRef to the actual lexeme and an int_value
+// int_value is only populated for token types where it applies. For example, for an
+// int literal of "0xF", then the int_value would be set to 15.
 typedef struct _Token {
     TokenType type;
     StringRef lexeme;
     long int_value;
 } Token;
 
+// These functions are defined in lexer.c
 TokenType token_type(StringRef str, char *lookahead);
 int lex(char *source, int source_len, Token *tokens);
 void print_tokens(Token *tokens, int token_num);

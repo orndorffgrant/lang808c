@@ -3,6 +3,7 @@
 
 #include "common.h"
 
+// This takes two "StringRef"s and compares them
 bool string_ref_eq(StringRef *s1, StringRef *s2) {
     STRINGREF_TO_CSTR1(s1, 512);
     STRINGREF_TO_CSTR2(s2, 512);
