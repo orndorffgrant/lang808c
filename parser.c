@@ -257,9 +257,9 @@ int bitfield_value(Token *tokens, int next_token, SymbolTable *symbols, int si_i
             }
         }
         next_token = match(t_semicolon, tokens, next_token, indent);
+        indent--;
     }
 
-    indent--;
     next_token = match(t_rightbrace, tokens, next_token, indent);
 
     return next_token;
