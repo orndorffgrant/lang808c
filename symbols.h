@@ -2,6 +2,7 @@
 #define SYMBOLS_H
 
 #include "common.h"
+#include "ir.h"
 
 // An enum for the different supported integer types
 typedef enum {
@@ -97,6 +98,8 @@ typedef struct _Function {
     int func_vars_len;
     bool returns;
     IntType return_type;
+    int ir_code_index;
+    int ir_code_len;
 } Function;
 
 // A struct representing an interrupt handler
@@ -128,6 +131,9 @@ typedef struct _SymbolTable {
 
     InterruptHandler interrupt_handlers[1024];
     int interrupt_handlers_num;
+
+    IROp ir_code[65536];
+    int ir_len;
 } SymbolTable;
 
 
@@ -141,6 +147,8 @@ int add_function(SymbolTable *symbols, Function item);
 int add_function_arg(SymbolTable *symbols, FunctionArg item);
 int add_static_variable(SymbolTable *symbols, Variable item);
 int add_function_variable(SymbolTable *symbols, Variable item);
+
+int add_function_ir(SymbolTable *symbols, int func_index, IROp item);
 
 int find_mmp_index(SymbolTable *symbols, StringRef *name);
 int find_struct_item_index(SymbolTable *symbols, int mmp_index, StringRef *name);

@@ -8,6 +8,7 @@
 
 #include "parser.h"
 #include "common.h"
+#include "ir.h"
 #include "lexer.h"
 #include "symbols.h"
 
