@@ -38,6 +38,15 @@ int add_function_variable(SymbolTable *symbols, Variable item) {
   return symbols->function_vars_num++;
 }
 
+int add_function_ir(SymbolTable *symbols, int func_index, IROp item) {
+  symbols->ir_code[symbols->ir_len] = item;
+  int index = symbols->ir_len;
+  symbols->ir_len++;
+  if (symbols->functions[func_index].ir_code_index == -1) {
+    symbols->functions[func_index].ir_code_index = index;
+  }
+  symbols->functions[func_index].ir_code_len++;
+}
 
 // These are helpers to find items by name (StringRef) in each of the arrays in the SymbolTable
 // They all return -1 if an item with the given name cannot be found

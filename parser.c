@@ -449,9 +449,16 @@ int initialize_statement(Token *tokens, int next_token, SymbolTable *symbols, in
         // TODO create IR
         next_token = bitfield_value(tokens, next_token, symbols, si_index, indent);
     } else {
-        // TODO create IR
         int value = 0;
         next_token = match_intliteral(tokens, next_token, &value, indent);
+
+        IROp op = {0};
+        op.opcode = ir_copy;
+        op.result.type = irv_mmp_struct_item;
+        op.result.mmp_struct_item_index = si_index;
+        op.arg1.type = irv_immediate;
+        op.arg1.immediate_value = value;
+        add_function_ir(symbols, INIT_FUNC_INDEX, op);
     }
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
@@ -629,6 +636,8 @@ int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     Function func;
     func.func_vars_index = -1;
     func.func_vars_len = 0;
+    func.ir_code_index = -1;
+    func.ir_code_len = 0;
 
     next_token = match(t_fun, tokens, next_token, indent);
     next_token = match_id(tokens, next_token, &func.name, indent);
@@ -720,11 +729,13 @@ int on_interrupt(Token *tokens, int next_token, SymbolTable *symbols, int indent
     Function func;
     func.func_args_index = -1;
     func.func_args_len = 0;
+    func.ir_code_index = -1;
+    func.ir_code_len = 0;
     func.func_vars_index = -1;
     func.func_vars_len = 0;
     func.returns = false;
-    func.name.str = "_____interrupt_handler";
-    func.name.len = 22;
+    func.name.str = "____interrupt_handler";
+    func.name.len = 21;
 
     int func_index = add_function(symbols, func);
 
@@ -758,6 +769,21 @@ int root_statement(Token *tokens, int next_token, SymbolTable *symbols) {
 // The entry-point for the parser
 // calls root_statement until all tokens are parsed.
 void parse(Token *tokens, int token_num, SymbolTable *symbols) {
+    // set up the special init function as function index 0
+    Function func;
+    func.func_args_index = -1;
+    func.func_args_len = 0;
+    func.ir_code_index = -1;
+    func.ir_code_len = 0;
+    func.func_vars_index = -1;
+    func.func_vars_len = 0;
+    func.returns = false;
+    func.name.str = "____init";
+    func.name.len = 8;
+    int func_index = add_function(symbols, func);
+    if (func_index != INIT_FUNC_INDEX) {
+        PANIC("somehow the init function isn't index 0");
+    }
     int next_token = 0;
     while (next_token < token_num) {
         next_token = root_statement(tokens, next_token, symbols);

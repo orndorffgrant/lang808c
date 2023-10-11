@@ -132,7 +132,7 @@ typedef struct _SymbolTable {
     InterruptHandler interrupt_handlers[1024];
     int interrupt_handlers_num;
 
-    IROp ir_code[65536];
+    IROp ir_code[4096];
     int ir_len;
 } SymbolTable;
 

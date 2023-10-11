@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "ir.h"
 #include "symbols.h"
 #include "lexer.h"
 #include "parser.h"
@@ -65,4 +66,13 @@ int main(int argc, char *argv[]) {
     // Pass the tokens to the "parse" function, which will populate the symbol table
     // "parse" is declared in "parser.h" and defined in "parser.c"
     parse(tokens, token_num, &symbols);
+
+    for (int i = 0; i < symbols.functions_num; i++) {
+        Function *func = &symbols.functions[i];
+        STRINGREF_TO_CSTR1(&func->name, 512);
+        printf("IR for function: %s\n", cstr1);
+        for (int j = func->ir_code_index; j < (func->ir_code_index + func->ir_code_len); j++) {
+            print_function_ir(symbols.ir_code + func->ir_code_index, func->ir_code_len);
+        }
+    }
 }
