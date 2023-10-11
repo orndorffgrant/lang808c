@@ -40,6 +40,7 @@ typedef struct _IRValue {
     int func_arg_index;
     int local_variable_index;
     int static_variable_index;
+    int mmp_index;
     int mmp_struct_item_index;
     int immediate_value;
     int temp_num;
@@ -53,7 +54,5 @@ typedef struct _IROp {
     IRValue arg1;
     IRValue arg2;
 } IROp;
-
-void print_function_ir(IROp *code, int len);
 
 #endif

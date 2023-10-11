@@ -1,5 +1,6 @@
 #include <stdbool.h>
 
+#include "ir.h"
 #include "symbols.h"
 #include "common.h"
 
@@ -143,4 +144,58 @@ int find_static_variable(SymbolTable *symbols, StringRef *name) {
         }
     }
     return -1;
+}
+
+
+void print_ir_value(SymbolTable *symbols, IRValue *value) {
+    switch (value->type) {
+        case irv_mmp_struct_item: {
+            // TODO need symbols
+            STRINGREF_TO_CSTR1(&symbols->mmps[value->mmp_index].name, 512);
+            STRINGREF_TO_CSTR2(&symbols->struct_items[value->mmp_struct_item_index].name, 512);
+            printf("%s.%s", cstr1, cstr2);
+            break;
+        }
+        case irv_immediate: {
+            printf("0x%x", value->immediate_value);
+            break;
+        }
+
+
+        default: PANIC("UNIDENTIFIED IR VALUE\n");
+    }
+}
+void print_irop(SymbolTable *symbols, int irop_index) {
+    IROp *op = &symbols->ir_code[irop_index];
+    switch (op->opcode) {
+        case ir_add:
+            print_ir_value(symbols, &op->result);
+            printf(" = ");
+            print_ir_value(symbols, &op->arg1);
+            printf(" + ");
+            print_ir_value(symbols, &op->arg2);
+            printf("\n");
+            break;
+        case ir_copy:
+            print_ir_value(symbols, &op->result);
+            printf(" = ");
+            print_ir_value(symbols, &op->arg1);
+            printf("\n");
+            break;
+        default: PANIC("UNIDENTIFIED IR OP\n");
+    }
+}
+void print_function_ir(SymbolTable *symbols, int func_index) {
+    Function *func = &symbols->functions[func_index];
+    STRINGREF_TO_CSTR1(&func->name, 512);
+    printf("IR for function: %s\n", cstr1);
+    for (int j = func->ir_code_index; j < (func->ir_code_index + func->ir_code_len); j++) {
+        print_irop(symbols, j);
+    }
+    printf("\n");
+}
+void print_all_ir(SymbolTable *symbols) {
+    for (int i = 0; i < symbols->functions_num; i++) {
+        print_function_ir(symbols, i);
+    }
 }

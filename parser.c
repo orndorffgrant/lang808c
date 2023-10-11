@@ -59,6 +59,14 @@ int match_id(Token *tokens, int next_token, StringRef *dest, int indent) {
     }
     return match(t_id, tokens, next_token, indent);
 }
+// parse a BitEnum token, putting the width value into dest
+int match_bitenum(Token *tokens, int next_token, int *dest, int indent) {
+    Token t = tokens[next_token];
+    if (t.type == t_be) {
+        *dest = t.int_value;
+    }
+    return match(t_be, tokens, next_token, indent);
+}
 
 enum name_result {
     name_mmp_struct_item,
@@ -229,9 +237,10 @@ int expression(Token *tokens, int next_token, SymbolTable *symbols, int func_ind
 // e.g. { val = 4; val2 = 6; val3 = enum_name }
 // check that the fields in the bitfield exist
 // check that enum names used for a particular field exist
-int bitfield_value(Token *tokens, int next_token, SymbolTable *symbols, int si_index, int indent) {
+int bitfield_value(Token *tokens, int next_token, SymbolTable *symbols, int si_index, int *dest, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitFieldValue:\n");
     next_token = match(t_leftbrace, tokens, next_token, indent);
+    int full_value = 0;
 
     while (tokens[next_token].type != t_rightbrace) {
         PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitFieldValueItem:\n");
@@ -243,25 +252,32 @@ int bitfield_value(Token *tokens, int next_token, SymbolTable *symbols, int si_i
             STRINGREF_TO_CSTR2(&symbols->struct_items[si_index].name, 512);
             PANIC("BitField field '%s' does not exist in struct item '%s'\n", cstr1, cstr2);
         }
+        BitFieldItem *bfi = &symbols->bitfield_items[bfi_index];
+        int field_value = 0;
         next_token = match(t_equals, tokens, next_token, indent);
         if (symbols->bitfield_items[bfi_index].type == bfi_int) {
-            // TODO actually process
-            next_token = match(t_intliteral, tokens, next_token, indent);
+            next_token = match_intliteral(tokens, next_token, &field_value, indent);
         } else {
+            // TODO
             StringRef be_item_name;
             next_token = match_id(tokens, next_token, &be_item_name, indent);
-            int be_index = find_bitenum_item_index(symbols, bfi_index, &be_item_name);
-            if (be_index == -1) {
+            int bei_index = find_bitenum_item_index(symbols, bfi_index, &be_item_name);
+            if (bei_index == -1) {
                 STRINGREF_TO_CSTR1(&bf_item_name, 512);
                 STRINGREF_TO_CSTR2(&be_item_name, 512);
                 PANIC("BitEnum for field '%s' does not include value called '%s'\n", cstr1, cstr2);
             }
+            BitEnumItem *bei = &symbols->bitenum_items[bei_index];
+            field_value = bei->value;
         }
         next_token = match(t_semicolon, tokens, next_token, indent);
+        full_value |= (field_value << bfi->offset);
         indent--;
     }
 
     next_token = match(t_rightbrace, tokens, next_token, indent);
+
+    *dest = full_value;
 
     return next_token;
 }
@@ -278,9 +294,9 @@ int mmp_def_structure_item_bf_item_enum_item(Token *tokens, int next_token, BitE
 }
 // parse a BitEnum definition e.g. "BitEnum5 { clock4 = 0x4; }"
 // add bit enum items to symbol table and link *be to those items
-int mmp_def_structure_item_bf_item_enum(Token *tokens, int next_token, SymbolTable *symbols, BitEnum *be, int indent) {
+int mmp_def_structure_item_bf_item_enum(Token *tokens, int next_token, SymbolTable *symbols, BitEnum *be, int *width, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitEnum:\n");
-    next_token = match(t_be, tokens, next_token, indent);
+    next_token = match_bitenum(tokens, next_token, width, indent);
     next_token = match(t_leftbrace, tokens, next_token, indent);
 
     be->be_items_index = -1;
@@ -316,7 +332,7 @@ int mmp_def_structure_item_bf_item(Token *tokens, int next_token, SymbolTable *s
     if (tokens[next_token].type == t_intliteral) {
         next_token = match_intliteral(tokens, next_token, &bfi->width, indent);
     } else {
-        next_token = mmp_def_structure_item_bf_item_enum(tokens, next_token, symbols, &bfi->be, indent);
+        next_token = mmp_def_structure_item_bf_item_enum(tokens, next_token, symbols, &bfi->be, &bfi->width, indent);
         bfi->type = bfi_enum;
     }
     next_token = match(t_semicolon, tokens, next_token, indent);
@@ -335,11 +351,14 @@ int mmp_def_structure_item_bf(Token *tokens, int next_token, SymbolTable *symbol
 
     si->bf.bf_items_index = -1;
     int bfi_index = 0;
+    int offset = 0;
     while (tokens[next_token].type == t_id || tokens[next_token].type == t_unused) {
         BitFieldItem bfi;
         // any number of bf items
         next_token = mmp_def_structure_item_bf_item(tokens, next_token, symbols, &bfi, indent);
 
+        bfi.offset = offset;
+        offset += bfi.width;
         bfi_index = add_bitfield_item(symbols, bfi);
         if (si->bf.bf_items_index == -1) {
             // first one
@@ -445,21 +464,22 @@ int initialize_statement(Token *tokens, int next_token, SymbolTable *symbols, in
 
     next_token = match(t_equals, tokens, next_token, indent);
 
+    int value = 0;
     if (symbols->struct_items[si_index].type == si_bf) {
-        // TODO create IR
-        next_token = bitfield_value(tokens, next_token, symbols, si_index, indent);
+        next_token = bitfield_value(tokens, next_token, symbols, si_index, &value, indent);
     } else {
-        int value = 0;
         next_token = match_intliteral(tokens, next_token, &value, indent);
-
-        IROp op = {0};
-        op.opcode = ir_copy;
-        op.result.type = irv_mmp_struct_item;
-        op.result.mmp_struct_item_index = si_index;
-        op.arg1.type = irv_immediate;
-        op.arg1.immediate_value = value;
-        add_function_ir(symbols, INIT_FUNC_INDEX, op);
     }
+
+    IROp op = {0};
+    op.opcode = ir_copy;
+    op.result.type = irv_mmp_struct_item;
+    op.result.mmp_index = mmp_index;
+    op.result.mmp_struct_item_index = si_index;
+    op.arg1.type = irv_immediate;
+    op.arg1.immediate_value = value;
+    add_function_ir(symbols, INIT_FUNC_INDEX, op);
+
     next_token = match(t_semicolon, tokens, next_token, indent);
     return next_token;
 }
@@ -506,7 +526,8 @@ int function_statement_assignment(Token *tokens, int next_token, SymbolTable *sy
     next_token = match(t_equals, tokens, next_token, indent);
     if (name_result.result == name_mmp_struct_item) {
         if (symbols->struct_items[name_result.si_index].type == si_bf) {
-            next_token = bitfield_value(tokens, next_token, symbols, name_result.si_index, indent);
+            int value = 0;
+            next_token = bitfield_value(tokens, next_token, symbols, name_result.si_index, &value, indent);
         } else {
             next_token = expression(tokens, next_token, symbols, func_index, indent);
         }

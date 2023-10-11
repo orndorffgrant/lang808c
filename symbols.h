@@ -36,6 +36,7 @@ typedef enum {
 typedef struct _BitFieldItem {
     BitFieldItemType type;
     StringRef name;
+    int offset;
     int width;
     BitEnum be;
 } BitFieldItem;
@@ -158,5 +159,7 @@ int find_function_index(SymbolTable *symbols, StringRef *name);
 int find_function_arg(SymbolTable *symbols, int func_index, StringRef *name);
 int find_function_variable(SymbolTable *symbols, int func_index, StringRef *name);
 int find_static_variable(SymbolTable *symbols, StringRef *name);
+
+void print_all_ir(SymbolTable *symbols);
 
 #endif
