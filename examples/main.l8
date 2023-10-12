@@ -130,7 +130,7 @@ MemoryMappedPeripheral GCLK @0x40000C00 {
 
 # Here we define the RTCMode0 peripheral
 # You can find the register definitions in the datasheet for the SAMD21
-MemoryMappedPeripheral RTCMode0 @0x40000C00 !3 {
+MemoryMappedPeripheral RTCMode0 @0x40001400 !3 {
     ctrl: BitField16 {
         swrst: 1;
         enable: 1;

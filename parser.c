@@ -400,9 +400,22 @@ int mmp_def_structure(Token *tokens, int next_token, SymbolTable *symbols, Memor
     next_token = match(t_leftbrace, tokens, next_token, indent);
     mmp->struct_items_index = -1;
     int si_index = 0;
+    int address = mmp->base_address;
     while (tokens[next_token].type == t_id || tokens[next_token].type == t_unused) {
         StructItem si;
         next_token = mmp_def_structure_item(tokens, next_token, symbols, &si, indent);
+        si.address = address;
+        if (si.type == si_int || si.type == si_unused) {
+            if (si.int_type == int_u8) {
+                address += 1;
+            } else if (si.int_type == int_u16) {
+                address += 2;
+            } else if (si.int_type == int_u32) {
+                address += 4;
+            }
+        } else { // si.type == si_bf
+            address += (si.bf.width / 8);
+        }
         si_index = add_struct_item(symbols, si);
         if (mmp->struct_items_index == -1) {
             // first one

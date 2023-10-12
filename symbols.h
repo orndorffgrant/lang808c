@@ -58,11 +58,11 @@ typedef enum {
 
 // A struct representing one item in a MemoryMappedPeripheral struct. e.g. "field: u16;"
 typedef struct _StructItem {
-    // TODO add address
     StructItemType type;
     StringRef name;
     IntType int_type;
     BitField bf;
+    int address;
 } StructItem;
 
 // A struct representing a MemoryMappedPeripheral.

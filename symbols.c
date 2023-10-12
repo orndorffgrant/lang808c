@@ -150,10 +150,9 @@ int find_static_variable(SymbolTable *symbols, StringRef *name) {
 void print_ir_value(SymbolTable *symbols, IRValue *value) {
     switch (value->type) {
         case irv_mmp_struct_item: {
-            // TODO need symbols
             STRINGREF_TO_CSTR1(&symbols->mmps[value->mmp_index].name, 512);
             STRINGREF_TO_CSTR2(&symbols->struct_items[value->mmp_struct_item_index].name, 512);
-            printf("%s.%s", cstr1, cstr2);
+            printf("0x%x(%s.%s)", symbols->struct_items[value->mmp_struct_item_index].address, cstr1, cstr2);
             break;
         }
         case irv_immediate: {
