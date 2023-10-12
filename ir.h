@@ -23,7 +23,9 @@ typedef enum _IROpCode {
     // arg1 used as param to upcoming function call
     ir_param,
     // call function in arg1
-    ir_call
+    ir_call,
+    // return arg1 from function
+    ir_return
 } IROpCode;
 typedef enum _IRValueType {
     irv_function,

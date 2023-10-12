@@ -132,12 +132,12 @@ int expression(Token *tokens, int next_token, SymbolTable *symbols, int func_ind
 
 // parse a function call e.g. "function_name(arg1, arg2)"
 // checks that the function exists and that the correct number of arguments are passed
-int function_call(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
+int function_call(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- FunctionCall:\n");
     StringRef func_name;
     next_token = match_id(tokens, next_token, &func_name, indent);
-    int func_index = find_function_index(symbols, &func_name);
-    if (func_index == -1) {
+    int called_func_index = find_function_index(symbols, &func_name);
+    if (called_func_index == -1) {
         STRINGREF_TO_CSTR1(&func_name, 512);
         PANIC("Function '%s' does not exist\n", cstr1);
     }
@@ -150,7 +150,7 @@ int function_call(Token *tokens, int next_token, SymbolTable *symbols, int inden
             next_token = match(t_comma, tokens, next_token, indent);
         }
     }
-    int expected_args = symbols->functions[func_index].func_args_len;
+    int expected_args = symbols->functions[called_func_index].func_args_len;
     if (num_args != expected_args) {
         STRINGREF_TO_CSTR1(&func_name, 512);
         PANIC("Incorrect number of arguments to function '%s'. Expected %d but got %d.\n", cstr1, expected_args, num_args);
@@ -159,34 +159,68 @@ int function_call(Token *tokens, int next_token, SymbolTable *symbols, int inden
     return next_token;
 }
 // terminal in an expression, either an int literal or a "name"
-int expression_term(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
+int expression_term(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int *temp, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ExpressionTerm:\n");
+    IROp op = {0};
+    op.result.type = irv_temp;
+    op.result.temp_num = *temp;
+    *temp = (*temp) + 1;
+    op.opcode = ir_copy;
     if (tokens[next_token].type == t_intliteral) {
-        next_token = match(t_intliteral, tokens, next_token, indent);
+        op.arg1.type = irv_immediate;
+        next_token = match_intliteral(tokens, next_token, &op.arg1.immediate_value, indent);
     } else {
         struct NameResolutionResult name_result;
         next_token = name(tokens, next_token, symbols, func_index, &name_result, indent);
+        if (name_result.result == name_mmp_struct_item) {
+            op.arg1.type = irv_mmp_struct_item;
+            op.arg1.mmp_index = name_result.mmp_index;
+            op.arg1.mmp_struct_item_index = name_result.si_index;
+        } else if (name_result.result == name_func_arg) {
+            op.arg1.type = irv_function_argument;
+            op.arg1.func_arg_index = name_result.func_arg_index;
+        } else if (name_result.result == name_local_var) {
+            op.arg1.type = irv_local_variable;
+            op.arg1.local_variable_index = name_result.local_var_index;
+        } else if (name_result.result == name_static_var) {
+            op.arg1.type = irv_static_variable;
+            op.arg1.static_variable_index = name_result.static_var_index;
+        }
     }
+    add_function_ir(symbols, func_index, op);
     return next_token;
 }
 // parse a shift expression e.g. "1 << 30"
-int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
+int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int *temp, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ShiftExpression:\n");
-    next_token = expression_term(tokens, next_token, symbols, func_index, indent);
+    int temp_arg1 = *temp;
+    next_token = expression_term(tokens, next_token, symbols, func_index, temp, indent);
+    IROp op = {0};
+    op.arg1.type = irv_temp;
+    op.arg1.temp_num = temp_arg1;
     switch (tokens[next_token].type) {
         case t_shiftleft:
             next_token = match(t_shiftleft, tokens, next_token, indent);
+            op.opcode = ir_shift_left;
             break;
         default:
             return next_token;
     }
-    next_token = expression_term(tokens, next_token, symbols, func_index, indent);
+    int temp_arg2 = *temp;
+    next_token = expression_term(tokens, next_token, symbols, func_index, temp, indent);
+    op.arg2.type = irv_temp;
+    op.arg2.temp_num = temp_arg2;
+
+    op.result.type = irv_temp;
+    op.result.temp_num = *temp;
+    *temp = (*temp) + 1;
+    add_function_ir(symbols, func_index, op);
     return next_token;
 }
 // parse a bitwise operation expression e.g. "1 & 30"
-int expression_bit(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
+int expression_bit(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int *temp, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitExpression:\n");
-    next_token = expression_shift(tokens, next_token, symbols, func_index, indent);
+    next_token = expression_shift(tokens, next_token, symbols, func_index, temp, indent);
     switch (tokens[next_token].type) {
         case t_and:
             next_token = match(t_and, tokens, next_token, indent);
@@ -194,13 +228,13 @@ int expression_bit(Token *tokens, int next_token, SymbolTable *symbols, int func
         default:
             return next_token;
     }
-    next_token = expression_shift(tokens, next_token, symbols, func_index, indent);
+    next_token = expression_shift(tokens, next_token, symbols, func_index, temp, indent);
     return next_token;
 }
 // parse an addition or subtraction operation expression e.g. "1 - 30"
-int expression_sum(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
+int expression_sum(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int *temp, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- SumExpression:\n");
-    next_token = expression_bit(tokens, next_token, symbols, func_index, indent);
+    next_token = expression_bit(tokens, next_token, symbols, func_index, temp, indent);
     switch (tokens[next_token].type) {
         case t_plus:
             next_token = match(t_plus, tokens, next_token, indent);
@@ -211,25 +245,38 @@ int expression_sum(Token *tokens, int next_token, SymbolTable *symbols, int func
         default:
             return next_token;
     }
-    next_token = expression_bit(tokens, next_token, symbols, func_index, indent);
+    next_token = expression_bit(tokens, next_token, symbols, func_index, temp, indent);
     return next_token;
 }
 // parse a comparison expression e.g. "1 > 30"
 int expression(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     // top level expression is comparison
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Expression:\n");
-    next_token = expression_sum(tokens, next_token, symbols, func_index, indent);
+    int temp = 0;
+    // TODO this op
+    IROp op = {0};
+    op.result.type = irv_temp;
+    op.result.temp_num = 0;
+    next_token = expression_sum(tokens, next_token, symbols, func_index, &temp, indent);
+    op.arg1.type = irv_temp;
+    op.arg1.temp_num = 1;
+
     switch (tokens[next_token].type) {
         case t_equalsequals:
             next_token = match(t_equalsequals, tokens, next_token, indent);
+            op.opcode = ir_equals;
             break;
         case t_lessthan:
             next_token = match(t_lessthan, tokens, next_token, indent);
+            op.opcode = ir_less_than;
             break;
         default:
+            op.opcode = ir_copy;
             return next_token;
     }
-    next_token = expression_sum(tokens, next_token, symbols, func_index, indent);
+    next_token = expression_sum(tokens, next_token, symbols, func_index, &temp, indent);
+    op.arg2.type = irv_temp;
+    op.arg2.temp_num = 2;
     return next_token;
 }
 
@@ -527,6 +574,14 @@ int function_statement_return(Token *tokens, int next_token, SymbolTable *symbol
     next_token = match(t_return, tokens, next_token, indent);
     next_token = expression(tokens, next_token, symbols, func_index, indent);
     next_token = match(t_semicolon, tokens, next_token, indent);
+    // TODO
+    /*
+    IROp op = {0};
+    op.opcode = ir_return;
+    op.arg1.type = irv_temp;
+    op.arg1.temp_num = var.initial_value;
+    add_function_ir(symbols, func_index, op);
+    */
     return next_token;
 }
 // parse assignment statement, e.g. "var = 5 + var;"
@@ -547,7 +602,7 @@ int function_statement_assignment(Token *tokens, int next_token, SymbolTable *sy
     } else {
         // local or static variable
         if (tokens[next_token].type == t_id && tokens[next_token + 1].type == t_leftparen) {
-            next_token = function_call(tokens, next_token, symbols, indent);
+            next_token = function_call(tokens, next_token, symbols, func_index, indent);
         } else {
             next_token = expression(tokens, next_token, symbols, func_index, indent);
         }
@@ -649,7 +704,7 @@ int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int 
             return function_statement_if(tokens, next_token, symbols, func_index, indent);
         case t_id:
             if (tokens[next_token+1].type == t_leftparen) {
-                next_token = function_call(tokens, next_token, symbols, indent);
+                next_token = function_call(tokens, next_token, symbols, func_index, indent);
                 next_token = match(t_semicolon, tokens, next_token, indent);
                 return next_token;
             } else {

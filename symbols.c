@@ -40,6 +40,7 @@ int add_function_variable(SymbolTable *symbols, Variable item) {
 }
 
 int add_function_ir(SymbolTable *symbols, int func_index, IROp item) {
+  //printf("func_index: %d; curr_ir_len: %d; curr_func_len: %d\n", func_index, symbols->ir_len, symbols->functions[func_index].ir_code_len);
   symbols->ir_code[symbols->ir_len] = item;
   int index = symbols->ir_len;
   symbols->ir_len++;
@@ -152,7 +153,7 @@ void print_ir_value(SymbolTable *symbols, IRValue *value) {
         case irv_mmp_struct_item: {
             STRINGREF_TO_CSTR1(&symbols->mmps[value->mmp_index].name, 512);
             STRINGREF_TO_CSTR2(&symbols->struct_items[value->mmp_struct_item_index].name, 512);
-            printf("0x%x(%s.%s)", symbols->struct_items[value->mmp_struct_item_index].address, cstr1, cstr2);
+            printf("%s.%s", cstr1, cstr2);
             break;
         }
         case irv_immediate: {
@@ -169,6 +170,15 @@ void print_ir_value(SymbolTable *symbols, IRValue *value) {
             printf("local %s", cstr1);
             break;
         }
+        case irv_temp: {
+            printf("temp%d", value->temp_num);
+            break;
+        }
+        case irv_function_argument: {
+            STRINGREF_TO_CSTR1(&symbols->func_args[value->func_arg_index].name, 512);
+            printf("arg %s", cstr1);
+            break;
+        }
 
         default: PANIC("UNIDENTIFIED IR VALUE: %d\n", value->type);
     }
@@ -181,6 +191,14 @@ void print_irop(SymbolTable *symbols, int irop_index) {
             printf(" = ");
             print_ir_value(symbols, &op->arg1);
             printf(" + ");
+            print_ir_value(symbols, &op->arg2);
+            printf("\n");
+            break;
+        case ir_shift_left:
+            print_ir_value(symbols, &op->result);
+            printf(" = ");
+            print_ir_value(symbols, &op->arg1);
+            printf(" << ");
             print_ir_value(symbols, &op->arg2);
             printf("\n");
             break;
@@ -206,4 +224,10 @@ void print_all_ir(SymbolTable *symbols) {
     for (int i = 0; i < symbols->functions_num; i++) {
         print_function_ir(symbols, i);
     }
+    /*
+    printf("\nALL LINEAR\n");
+    for (int i = 0; i < symbols->ir_len; i++) {
+        print_irop(symbols, i);
+    }
+    */
 }
