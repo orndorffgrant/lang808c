@@ -605,6 +605,13 @@ int function_statement_local_var(Token *tokens, int next_token, SymbolTable *sym
     }
     symbols->functions[func_index].func_vars_len++;
 
+    IROp op = {0};
+    op.opcode = ir_copy;
+    op.result.type = irv_local_variable;
+    op.result.local_variable_index = var_index;
+    op.arg1.type = irv_immediate;
+    op.arg1.immediate_value = var.initial_value;
+    add_function_ir(symbols, func_index, op);
     return next_token;
 }
 // parse for-loop, e.g. "for (u32 i = 1; i < 10; i = i + 1) {}"

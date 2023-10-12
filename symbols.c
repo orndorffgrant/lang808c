@@ -164,7 +164,11 @@ void print_ir_value(SymbolTable *symbols, IRValue *value) {
             printf("static %s", cstr1);
             break;
         }
-
+        case irv_local_variable: {
+            STRINGREF_TO_CSTR1(&symbols->function_vars[value->local_variable_index].name, 512);
+            printf("local %s", cstr1);
+            break;
+        }
 
         default: PANIC("UNIDENTIFIED IR VALUE: %d\n", value->type);
     }
@@ -186,7 +190,7 @@ void print_irop(SymbolTable *symbols, int irop_index) {
             print_ir_value(symbols, &op->arg1);
             printf("\n");
             break;
-        default: PANIC("UNIDENTIFIED IR OP\n");
+        default: PANIC("UNIDENTIFIED IR OP: %d\n", op->opcode);
     }
 }
 void print_function_ir(SymbolTable *symbols, int func_index) {

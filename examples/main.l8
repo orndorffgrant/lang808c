@@ -261,6 +261,11 @@ initialize RTCMode0 {
     };
 }
 
+# This defines a static variable, which is a global variable at a static location in memory
+# Here, the variable is called "counting_up" and initialized to 1.
+static u32 counting_up = 1;
+static u32 blink_times = 1;
+
 # This function just loops for a while to take up some time
 # The number of times it loops is passed via a function argument
 fun delay(delay_count: u32) {
@@ -278,10 +283,6 @@ fun blinkLED() {
     delay(1000);
     PortB.outtgl = 1 << 30;
 }
-
-# This defines a static variable, which is a global variable at a static location in memory
-# Here, the variable is called "counting_up" and initialized to 1.
-static u32 counting_up = 1;
 
 # This function calls "blinkLED" the number of times passed as the argument.
 # Then it calculates the number of times we should blink next time the RTC interrupt is called.
@@ -307,8 +308,6 @@ fun blink_and_update_blink_times(blink_times: u32): u32 {
 
     return new_blink_times;
 }
-
-static u32 blink_times = 1;
 
 # on_interrupt keyword auto-enables interrupt in NVIC
 on_interrupt RTCMode0 {
