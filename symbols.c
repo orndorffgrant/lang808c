@@ -159,9 +159,14 @@ void print_ir_value(SymbolTable *symbols, IRValue *value) {
             printf("0x%x", value->immediate_value);
             break;
         }
+        case irv_static_variable: {
+            STRINGREF_TO_CSTR1(&symbols->static_vars[value->static_variable_index].name, 512);
+            printf("static %s", cstr1);
+            break;
+        }
 
 
-        default: PANIC("UNIDENTIFIED IR VALUE\n");
+        default: PANIC("UNIDENTIFIED IR VALUE: %d\n", value->type);
     }
 }
 void print_irop(SymbolTable *symbols, int irop_index) {

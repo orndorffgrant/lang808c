@@ -734,7 +734,15 @@ int static_var(Token *tokens, int next_token, SymbolTable *symbols, int indent) 
     next_token = match_intliteral(tokens, next_token, &var.initial_value, indent);
     next_token = match(t_semicolon, tokens, next_token, indent);
 
-    add_static_variable(symbols, var);
+    int index = add_static_variable(symbols, var);
+
+    IROp op = {0};
+    op.opcode = ir_copy;
+    op.result.type = irv_static_variable;
+    op.result.static_variable_index = index;
+    op.arg1.type = irv_immediate;
+    op.arg1.immediate_value = var.initial_value;
+    add_function_ir(symbols, INIT_FUNC_INDEX, op);
     return next_token;
 }
 
