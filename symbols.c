@@ -39,8 +39,16 @@ int add_function_variable(SymbolTable *symbols, Variable item) {
   return symbols->function_vars_num++;
 }
 
+static int next_ir_label = 0;
+void set_next_ir_label(int label) {
+    next_ir_label = label;
+}
 int add_function_ir(SymbolTable *symbols, int func_index, IROp item) {
   //printf("func_index: %d; curr_ir_len: %d; curr_func_len: %d\n", func_index, symbols->ir_len, symbols->functions[func_index].ir_code_len);
+  if (next_ir_label != 0) {
+    item.label = next_ir_label;
+    next_ir_label = 0;
+  }
   symbols->ir_code[symbols->ir_len] = item;
   int index = symbols->ir_len;
   symbols->ir_len++;
@@ -48,6 +56,7 @@ int add_function_ir(SymbolTable *symbols, int func_index, IROp item) {
     symbols->functions[func_index].ir_code_index = index;
   }
   symbols->functions[func_index].ir_code_len++;
+  return index;
 }
 
 // These are helpers to find items by name (StringRef) in each of the arrays in the SymbolTable
@@ -189,6 +198,11 @@ void print_ir_value(SymbolTable *symbols, IRValue *value) {
 }
 void print_irop(SymbolTable *symbols, int irop_index) {
     IROp *op = &symbols->ir_code[irop_index];
+    if (op->label != 0) {
+        printf("%2d: ", op->label);
+    } else {
+        printf("    ");
+    }
     switch (op->opcode) {
         case ir_add:
             print_ir_value(symbols, &op->result);
@@ -250,7 +264,7 @@ void print_irop(SymbolTable *symbols, int irop_index) {
         case ir_if:
             printf("if ");
             print_ir_value(symbols, &op->arg1);
-            printf("!= 0 then goto %d\n", op->target_label);
+            printf(" != 0 then goto %d\n", op->target_label);
             break;
         case ir_param:
             printf("param ");
@@ -258,7 +272,8 @@ void print_irop(SymbolTable *symbols, int irop_index) {
             printf("\n");
             break;
         case ir_call:
-            printf("call ");
+            print_ir_value(symbols, &op->result);
+            printf(" = call ");
             print_ir_value(symbols, &op->arg1);
             printf("\n");
             break;

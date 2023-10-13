@@ -149,6 +149,7 @@ int add_function_arg(SymbolTable *symbols, FunctionArg item);
 int add_static_variable(SymbolTable *symbols, Variable item);
 int add_function_variable(SymbolTable *symbols, Variable item);
 
+void set_next_ir_label(int label);
 int add_function_ir(SymbolTable *symbols, int func_index, IROp item);
 
 int find_mmp_index(SymbolTable *symbols, StringRef *name);
