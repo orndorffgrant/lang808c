@@ -150,6 +150,26 @@ int find_static_variable(SymbolTable *symbols, StringRef *name) {
 
 void print_ir_value(SymbolTable *symbols, IRValue *value) {
     switch (value->type) {
+        case irv_function: {
+            STRINGREF_TO_CSTR1(&symbols->functions[value->func_index].name, 512);
+            printf("func %s", cstr1);
+            break;
+        }
+        case irv_function_argument: {
+            STRINGREF_TO_CSTR1(&symbols->func_args[value->func_arg_index].name, 512);
+            printf("arg %s", cstr1);
+            break;
+        }
+        case irv_local_variable: {
+            STRINGREF_TO_CSTR1(&symbols->function_vars[value->local_variable_index].name, 512);
+            printf("local %s", cstr1);
+            break;
+        }
+        case irv_static_variable: {
+            STRINGREF_TO_CSTR1(&symbols->static_vars[value->static_variable_index].name, 512);
+            printf("static %s", cstr1);
+            break;
+        }
         case irv_mmp_struct_item: {
             STRINGREF_TO_CSTR1(&symbols->mmps[value->mmp_index].name, 512);
             STRINGREF_TO_CSTR2(&symbols->struct_items[value->mmp_struct_item_index].name, 512);
@@ -160,26 +180,10 @@ void print_ir_value(SymbolTable *symbols, IRValue *value) {
             printf("0x%x", value->immediate_value);
             break;
         }
-        case irv_static_variable: {
-            STRINGREF_TO_CSTR1(&symbols->static_vars[value->static_variable_index].name, 512);
-            printf("static %s", cstr1);
-            break;
-        }
-        case irv_local_variable: {
-            STRINGREF_TO_CSTR1(&symbols->function_vars[value->local_variable_index].name, 512);
-            printf("local %s", cstr1);
-            break;
-        }
         case irv_temp: {
             printf("temp%d", value->temp_num);
             break;
         }
-        case irv_function_argument: {
-            STRINGREF_TO_CSTR1(&symbols->func_args[value->func_arg_index].name, 512);
-            printf("arg %s", cstr1);
-            break;
-        }
-
         default: PANIC("UNIDENTIFIED IR VALUE: %d\n", value->type);
     }
 }
@@ -194,6 +198,14 @@ void print_irop(SymbolTable *symbols, int irop_index) {
             print_ir_value(symbols, &op->arg2);
             printf("\n");
             break;
+        case ir_subtract:
+            print_ir_value(symbols, &op->result);
+            printf(" = ");
+            print_ir_value(symbols, &op->arg1);
+            printf(" - ");
+            print_ir_value(symbols, &op->arg2);
+            printf("\n");
+            break;
         case ir_shift_left:
             print_ir_value(symbols, &op->result);
             printf(" = ");
@@ -202,9 +214,56 @@ void print_irop(SymbolTable *symbols, int irop_index) {
             print_ir_value(symbols, &op->arg2);
             printf("\n");
             break;
+        case ir_bitwise_and:
+            print_ir_value(symbols, &op->result);
+            printf(" = ");
+            print_ir_value(symbols, &op->arg1);
+            printf(" & ");
+            print_ir_value(symbols, &op->arg2);
+            printf("\n");
+            break;
+        case ir_equals:
+            print_ir_value(symbols, &op->result);
+            printf(" = ");
+            print_ir_value(symbols, &op->arg1);
+            printf(" == ");
+            print_ir_value(symbols, &op->arg2);
+            printf("\n");
+            break;
+        case ir_less_than:
+            print_ir_value(symbols, &op->result);
+            printf(" = ");
+            print_ir_value(symbols, &op->arg1);
+            printf(" < ");
+            print_ir_value(symbols, &op->arg2);
+            printf("\n");
+            break;
         case ir_copy:
             print_ir_value(symbols, &op->result);
             printf(" = ");
+            print_ir_value(symbols, &op->arg1);
+            printf("\n");
+            break;
+        case ir_goto:
+            printf("goto %d\n", op->target_label);
+            break;
+        case ir_if:
+            printf("if ");
+            print_ir_value(symbols, &op->arg1);
+            printf("!= 0 then goto %d\n", op->target_label);
+            break;
+        case ir_param:
+            printf("param ");
+            print_ir_value(symbols, &op->arg1);
+            printf("\n");
+            break;
+        case ir_call:
+            printf("call ");
+            print_ir_value(symbols, &op->arg1);
+            printf("\n");
+            break;
+        case ir_return:
+            printf("return ");
             print_ir_value(symbols, &op->arg1);
             printf("\n");
             break;

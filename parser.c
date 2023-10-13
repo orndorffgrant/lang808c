@@ -193,11 +193,10 @@ int expression_term(Token *tokens, int next_token, SymbolTable *symbols, int fun
 // parse a shift expression e.g. "1 << 30"
 int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int *temp, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ShiftExpression:\n");
-    int temp_arg1 = *temp;
     next_token = expression_term(tokens, next_token, symbols, func_index, temp, indent);
     IROp op = {0};
     op.arg1.type = irv_temp;
-    op.arg1.temp_num = temp_arg1;
+    op.arg1.temp_num = (*temp) - 1;
     switch (tokens[next_token].type) {
         case t_shiftleft:
             next_token = match(t_shiftleft, tokens, next_token, indent);
@@ -206,10 +205,9 @@ int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int fu
         default:
             return next_token;
     }
-    int temp_arg2 = *temp;
     next_token = expression_term(tokens, next_token, symbols, func_index, temp, indent);
     op.arg2.type = irv_temp;
-    op.arg2.temp_num = temp_arg2;
+    op.arg2.temp_num = (*temp) - 1;
 
     op.result.type = irv_temp;
     op.result.temp_num = *temp;
@@ -221,31 +219,54 @@ int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int fu
 int expression_bit(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int *temp, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- BitExpression:\n");
     next_token = expression_shift(tokens, next_token, symbols, func_index, temp, indent);
+    IROp op = {0};
+    op.arg1.type = irv_temp;
+    op.arg1.temp_num = (*temp) - 1;
     switch (tokens[next_token].type) {
         case t_and:
             next_token = match(t_and, tokens, next_token, indent);
+            op.opcode = ir_bitwise_and;
             break;
         default:
             return next_token;
     }
     next_token = expression_shift(tokens, next_token, symbols, func_index, temp, indent);
+    op.arg2.type = irv_temp;
+    op.arg2.temp_num = (*temp) - 1;
+
+    op.result.type = irv_temp;
+    op.result.temp_num = *temp;
+    *temp = (*temp) + 1;
+    add_function_ir(symbols, func_index, op);
     return next_token;
 }
 // parse an addition or subtraction operation expression e.g. "1 - 30"
 int expression_sum(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int *temp, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- SumExpression:\n");
     next_token = expression_bit(tokens, next_token, symbols, func_index, temp, indent);
+    IROp op = {0};
+    op.arg1.type = irv_temp;
+    op.arg1.temp_num = (*temp) - 1;
     switch (tokens[next_token].type) {
         case t_plus:
             next_token = match(t_plus, tokens, next_token, indent);
+            op.opcode = ir_add;
             break;
         case t_minus:
             next_token = match(t_minus, tokens, next_token, indent);
+            op.opcode = ir_subtract;
             break;
         default:
             return next_token;
     }
     next_token = expression_bit(tokens, next_token, symbols, func_index, temp, indent);
+    op.arg2.type = irv_temp;
+    op.arg2.temp_num = (*temp) - 1;
+
+    op.result.type = irv_temp;
+    op.result.temp_num = *temp;
+    *temp = (*temp) + 1;
+    add_function_ir(symbols, func_index, op);
     return next_token;
 }
 // parse a comparison expression e.g. "1 > 30"
@@ -253,13 +274,11 @@ int expression(Token *tokens, int next_token, SymbolTable *symbols, int func_ind
     // top level expression is comparison
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- Expression:\n");
     int temp = 0;
-    // TODO this op
-    IROp op = {0};
-    op.result.type = irv_temp;
-    op.result.temp_num = 0;
+
     next_token = expression_sum(tokens, next_token, symbols, func_index, &temp, indent);
+    IROp op = {0};
     op.arg1.type = irv_temp;
-    op.arg1.temp_num = 1;
+    op.arg1.temp_num = temp - 1;
 
     switch (tokens[next_token].type) {
         case t_equalsequals:
@@ -271,12 +290,15 @@ int expression(Token *tokens, int next_token, SymbolTable *symbols, int func_ind
             op.opcode = ir_less_than;
             break;
         default:
-            op.opcode = ir_copy;
             return next_token;
     }
     next_token = expression_sum(tokens, next_token, symbols, func_index, &temp, indent);
     op.arg2.type = irv_temp;
-    op.arg2.temp_num = 2;
+    op.arg2.temp_num = temp - 1;
+
+    op.result.type = irv_temp;
+    op.result.temp_num = temp;
+    add_function_ir(symbols, func_index, op);
     return next_token;
 }
 
