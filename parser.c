@@ -897,6 +897,16 @@ int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     }
     next_token = match(t_rightbrace, tokens, next_token, indent);
 
+
+    if (symbols->ir_code[func_ref->ir_code_index + (func_ref->ir_code_len - 1)].opcode != ir_return) {
+        // if there was no final return, add one
+        IROp op = {0};
+        op.opcode = ir_return;
+        op.arg1.type = irv_immediate;
+        op.arg1.immediate_value = 0;
+        add_function_ir(symbols, func_index, op);
+    }
+
     return next_token;
 }
 
@@ -966,6 +976,13 @@ int on_interrupt(Token *tokens, int next_token, SymbolTable *symbols, int indent
         next_token = function_statement(tokens, next_token, symbols, func_index, indent);
     }
     next_token = match(t_rightbrace, tokens, next_token, indent);
+
+    // add final return
+    IROp op = {0};
+    op.opcode = ir_return;
+    op.arg1.type = irv_immediate;
+    op.arg1.immediate_value = 0;
+    add_function_ir(symbols, func_index, op);
     return next_token;
 }
 
