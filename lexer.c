@@ -42,7 +42,7 @@ char *token_type_to_static_string(TokenType token_type) {
         case t_on_interrupt: return "on_interrupt";
         case t_fun: return "fun";
         case t_static: return "static";
-        case t_for: return "for";
+        case t_while: return "while";
         case t_if: return "if";
         case t_else: return "else";
         case t_return: return "return";
@@ -259,8 +259,8 @@ TokenType token_type(StringRef str, char *lookahead) {
         return t_fun;
     } else if (str.len == 6 && strncmp(str.str, "static", str.len) == 0) {
         return t_static;
-    } else if (str.len == 3 && strncmp(str.str, "for", str.len) == 0) {
-        return t_for;
+    } else if (str.len == 5 && strncmp(str.str, "while", str.len) == 0) {
+        return t_while;
     } else if (str.len == 2 && strncmp(str.str, "if", str.len) == 0) {
         return t_if;
     } else if (str.len == 4 && strncmp(str.str, "else", str.len) == 0) {

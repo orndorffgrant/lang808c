@@ -765,19 +765,31 @@ int function_statement_local_var(Token *tokens, int next_token, SymbolTable *sym
     add_function_ir(symbols, func_index, op);
     return next_token;
 }
-// parse for-loop, e.g. "for (u32 i = 1; i < 10; i = i + 1) {}"
-int function_statement_for_loop(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
+// parse while-loop, e.g. "while (i < 10) { i = i + 1 }"
+int function_statement_while_loop(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- ForLoop:\n");
-    next_token = match(t_for, tokens, next_token, indent);
+    next_token = match(t_while, tokens, next_token, indent);
     next_token = match(t_leftparen, tokens, next_token, indent);
 
-    next_token = function_statement(tokens, next_token, symbols, func_index, indent);
-
+    int begin_loop_label = label;
+    set_next_ir_label(label);
+    label++;
     int temp = 0;
     next_token = expression(tokens, next_token, symbols, func_index, &temp, indent);
-    next_token = match(t_semicolon, tokens, next_token, indent);
 
-    next_token = function_statement(tokens, next_token, symbols, func_index, indent);
+    IROp if_op = {0};
+    if_op.opcode = ir_if;
+    if_op.arg1.type = irv_temp;
+    if_op.arg1.temp_num = temp;
+    if_op.target_label = label;
+    add_function_ir(symbols, func_index, if_op);
+
+    IROp goto_op = {0};
+    goto_op.opcode = ir_goto;
+    int goto_op_i = add_function_ir(symbols, func_index, goto_op);
+
+    set_next_ir_label(label);
+    label++;
 
     next_token = match(t_rightparen, tokens, next_token, indent);
     next_token = match(t_leftbrace, tokens, next_token, indent);
@@ -788,13 +800,21 @@ int function_statement_for_loop(Token *tokens, int next_token, SymbolTable *symb
     }
 
     next_token = match(t_rightbrace, tokens, next_token, indent);
+    IROp goto_loop_op = {0};
+    goto_loop_op.opcode = ir_goto;
+    goto_loop_op.target_label = begin_loop_label;
+    add_function_ir(symbols, func_index, goto_loop_op);
+
+    set_next_ir_label(label);
+    symbols->ir_code[goto_op_i].target_label = label;
+    label++;
     return next_token;
 }
 // parse any function statement, lookahead at next token to determine which kind of statement it will be
 int function_statement(Token *tokens, int next_token, SymbolTable *symbols, int func_index, int indent) {
     switch (tokens[next_token].type) {
-        case t_for:
-            return function_statement_for_loop(tokens, next_token, symbols, func_index, indent);
+        case t_while:
+            return function_statement_while_loop(tokens, next_token, symbols, func_index, indent);
         case t_inttype:
             return function_statement_local_var(tokens, next_token, symbols, func_index, indent);
         case t_if:
