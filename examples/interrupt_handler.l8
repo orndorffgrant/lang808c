@@ -1,8 +1,11 @@
-# This is just an example Lang808 snippet for demonstrating a portion of the compiler.
+# This is just an example Lang808 snippet for demonstrating a portion
+# of the compiler.
 # It does not do anything meaningful.
 
-# This defines a memory mapped peripheral with one register with a base address of 0x40000000
-# Notice that this peripheral has the optional interrupt number specified as "12"
+# This defines a memory mapped peripheral with one register with a
+# base address of 0x40000000
+# Notice that this peripheral has the optional interrupt number
+# specified as "12"
 MemoryMappedPeripheral RTCMode0 @0x40000000 !12 {
   count: u32;
 }

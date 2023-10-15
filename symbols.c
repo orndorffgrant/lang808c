@@ -44,7 +44,6 @@ void set_next_ir_label(int label) {
     next_ir_label = label;
 }
 int add_function_ir(SymbolTable *symbols, int func_index, IROp item) {
-  //printf("func_index: %d; curr_ir_len: %d; curr_func_len: %d\n", func_index, symbols->ir_len, symbols->functions[func_index].ir_code_len);
   if (next_ir_label != 0) {
     item.label = next_ir_label;
     next_ir_label = 0;
@@ -288,7 +287,7 @@ void print_irop(SymbolTable *symbols, int irop_index) {
 void print_function_ir(SymbolTable *symbols, int func_index) {
     Function *func = &symbols->functions[func_index];
     STRINGREF_TO_CSTR1(&func->name, 512);
-    printf("IR for function: %s\n", cstr1);
+    printf("function %s IR\n", cstr1);
     for (int j = func->ir_code_index; j < (func->ir_code_index + func->ir_code_len); j++) {
         print_irop(symbols, j);
     }
@@ -298,10 +297,4 @@ void print_all_ir(SymbolTable *symbols) {
     for (int i = 0; i < symbols->functions_num; i++) {
         print_function_ir(symbols, i);
     }
-    /*
-    printf("\nALL LINEAR\n");
-    for (int i = 0; i < symbols->ir_len; i++) {
-        print_irop(symbols, i);
-    }
-    */
 }
