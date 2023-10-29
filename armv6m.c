@@ -1,6 +1,13 @@
 #include "armv6m.h"
+#include "common.h"
 #include "ir.h"
 #include "symbols.h"
+
+#define R_ARG1 0
+#define R_ARG2 1 // could probably combine arg2 and dest registers
+#define R_DEST 2
+#define R_SCRATCH 3
+#define R_TEMP_OFFSET 4
 
 #define ADDS_OPCODE 0b000110
 #define MOV_OPCODE0 0b001000
@@ -9,6 +16,9 @@
 #define LSLS_OPCODE1 0b000001
 #define DATA_OPCODE 0b010000
 #define DATA_ANDS_OPCODE 0b0000
+#define STR_OPCODE 0b0101000
+#define STRH_OPCODE 0b0101001
+#define STRB_OPCODE 0b0101010
 
 void add_armv6m_inst(ARMv6Op op, MachineCodeFunction *code_func) {
     code_func->ops[code_func->len] = op;
@@ -35,38 +45,71 @@ void ands(int rd, int rm, MachineCodeFunction *code_func) {
     op.code = (DATA_OPCODE << 10) | (DATA_ANDS_OPCODE << 6) | (rm << 3) | (rd);
     add_armv6m_inst(op, code_func);
 }
+void str(int rt, int rn, int rm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (STR_OPCODE << 9) | (rm << 6) | (rn << 3) | (rt);
+    add_armv6m_inst(op, code_func);
+}
+void strb(int rt, int rn, int rm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (STRB_OPCODE << 9) | (rm << 6) | (rn << 3) | (rt);
+    add_armv6m_inst(op, code_func);
+}
+void strh(int rt, int rn, int rm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (STRH_OPCODE << 9) | (rm << 6) | (rn << 3) | (rt);
+    add_armv6m_inst(op, code_func);
+}
+
+void immediate_to_rX(int imm, int r, MachineCodeFunction *code_func) {
+    if (imm <= 0xFF) {
+        mov(r, imm, code_func);
+    } else if (imm <= 0xFFFF) {
+        mov(r, (imm & 0xFF00) >> 8, code_func);
+        lsls(r, r, 8, code_func);
+        mov(R_SCRATCH, imm & 0xFF, code_func);
+        ands(r, R_SCRATCH, code_func);
+    } else if (imm <= 0xFFFFFF) {
+        mov(r, (imm & 0xFF0000) >> 16, code_func);
+        lsls(r, r, 8, code_func);
+        mov(R_SCRATCH, (imm & 0xFF00) >> 8, code_func);
+        ands(r, R_SCRATCH, code_func);
+        lsls(r, r, 8, code_func);
+        mov(R_SCRATCH, imm & 0xFF, code_func);
+        ands(r, R_SCRATCH, code_func);
+    } else if (imm <= 0xFFFFFFFF) {
+        mov(r, (imm & 0xFF000000) >> 24, code_func);
+        lsls(r, r, 8, code_func);
+        mov(R_SCRATCH, (imm & 0xFF0000) >> 16, code_func);
+        ands(r, R_SCRATCH, code_func);
+        lsls(r, r, 8, code_func);
+        mov(R_SCRATCH, (imm & 0xFF00) >> 8, code_func);
+        ands(r, R_SCRATCH, code_func);
+        lsls(r, r, 8, code_func);
+        mov(R_SCRATCH, imm & 0xFF, code_func);
+        ands(r, R_SCRATCH, code_func);
+    }
+}
 
 // Returns register that will have the arg value
 int arg_to_rX(IRValue *arg, int r, MachineCodeFunction *code_func) {
     switch (arg->type) {
         case irv_temp: {
-            return arg->temp_num + 2;
+            return arg->temp_num + R_TEMP_OFFSET;
         }
         case irv_immediate: {
-            if (arg->immediate_value <= 0xFF) {
-                mov(r, arg->immediate_value, code_func);
-                return r;
-            } else if (arg->immediate_value <= 0xFFFF) {
-                mov(r, (arg->immediate_value & 0xFF00) >> 8, code_func);
-                lsls(r, r, 8, code_func);
-                int extra_scratch_r = 1 ? r == 0 : 0;
-                mov(extra_scratch_r, arg->immediate_value & 0xFF, code_func);
-                ands(r, extra_scratch_r, code_func);
-                return r;
-            }
-            // TODO
-            return r;
+            immediate_to_rX(arg->immediate_value, r, code_func);
         }
         // default: PANIC("UNHANDLED IR VALUE: %d\n", arg->type);
     }
 }
 int result_rx(IRValue *result) {
     if (result->type == irv_temp) {
-        return result->temp_num + 2;
+        return result->temp_num + R_TEMP_OFFSET;
     }
-    return 0;
+    return R_ARG1;
 }
-void rx_to_result(IRValue *result, int r, MachineCodeFunction *code_func) {
+void rx_to_result(SymbolTable *symbols, IRValue *result, int r, MachineCodeFunction *code_func) {
     switch (result->type) {
         case irv_temp: {
             return;
@@ -74,18 +117,42 @@ void rx_to_result(IRValue *result, int r, MachineCodeFunction *code_func) {
         case irv_immediate: {
             PANIC("IR RESULT CAN'T BE IMMEDIATE");
         }
-        //default: PANIC("UNHANDLED IR VALUE: %d\n", arg->type);
+        case irv_mmp_struct_item: {
+            StructItem *si = &symbols->struct_items[result->mmp_struct_item_index];
+            immediate_to_rX(si->address, R_DEST, code_func);
+            int width = 0;
+            if (si->type == si_bf) {
+                width = si->bf.width;
+            } else if (si->int_type == int_u8) {
+                width = 8;
+            } else if (si->int_type == int_u16) {
+                width = 16;
+            } else if (si->int_type == int_u32) {
+                width = 32;
+            }
+            if (width == 8) {
+                strb(r, R_DEST, 0, code_func);
+            } else if (width == 16) {
+                strh(r, R_DEST, 0, code_func);
+            } else if (width == 32) {
+                str(r, R_DEST, 0, code_func);
+            } else {
+                PANIC("INVALID WIDTH OF STRUCT ITEM\n");
+            }
+            return;
+        }
+        //default: PANIC("UNHANDLED IR VALUE: %d\n", result->type);
     }
 }
 
-void ir_to_armv6m_inst(IROp *ir_op, MachineCodeFunction *code_func) {
+void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *code_func) {
     switch (ir_op->opcode) {
         case ir_add: {
-            int rn = arg_to_rX(&ir_op->arg1, 0, code_func);
-            int rm = arg_to_rX(&ir_op->arg2, 1, code_func);
+            int rn = arg_to_rX(&ir_op->arg1, R_ARG1, code_func);
+            int rm = arg_to_rX(&ir_op->arg2, R_ARG2, code_func);
             int rd = result_rx(&ir_op->result);
             adds(rd, rn, rm, code_func);
-            rx_to_result(&ir_op->result, rd, code_func);
+            rx_to_result(symbols, &ir_op->result, rd, code_func);
             break;
         }
         case ir_copy: {
@@ -93,8 +160,8 @@ void ir_to_armv6m_inst(IROp *ir_op, MachineCodeFunction *code_func) {
                 int rd = result_rx(&ir_op->result);
                 int rn = arg_to_rX(&ir_op->arg1, rd, code_func);
             } else {
-                int rn = arg_to_rX(&ir_op->arg1, 0, code_func);
-                rx_to_result(&ir_op->result, rn, code_func);
+                int rn = arg_to_rX(&ir_op->arg1, R_ARG1, code_func);
+                rx_to_result(symbols, &ir_op->result, rn, code_func);
             }
             break;
         }
@@ -106,7 +173,7 @@ void ir_to_armv6m_inst(IROp *ir_op, MachineCodeFunction *code_func) {
 void ir_to_armv6m_function(SymbolTable *symbols, MachineCodeFunction *code_func, int func_index) {
     Function *func = &symbols->functions[func_index];
     for (int i = 0; i < func->ir_code_len; i++) {
-        ir_to_armv6m_inst(&symbols->ir_code[func->ir_code_index + i], code_func);
+        ir_to_armv6m_inst(symbols, &symbols->ir_code[func->ir_code_index + i], code_func);
     }
 }
 
