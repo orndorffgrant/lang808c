@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "armv6m.h"
 #include "common.h"
 #include "ir.h"
 #include "symbols.h"
@@ -65,7 +66,20 @@ int main(int argc, char *argv[]) {
     memset(&symbols, 0, sizeof(symbols));
     // Pass the tokens to the "parse" function, which will populate the symbol table
     // "parse" is declared in "parser.h" and defined in "parser.c"
+    // This incudes generating the IR three-address-code, which is stored in the
+    // symbol table as well
     parse(tokens, token_num, &symbols);
 
-    print_all_ir(&symbols);
+    // print_all_ir(&symbols);
+
+    // Initialize the MachineCode struct
+    // "MachineCode" is defined in "armv6m.h"
+    MachineCode code;
+    memset(&code, 0, sizeof(code));
+    // Pass the symbols to the "ir_to_armv6m" function, which will translate the IR
+    // into ARMv6-M. Note that labels are not resolved to memory addresses yet, so 
+    // jump/branch instructions will not be complete.
+    ir_to_armv6m(&symbols, &code);
+
+    print_all_machine_code(&symbols, &code);
 }
