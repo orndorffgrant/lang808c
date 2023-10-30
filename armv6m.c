@@ -41,13 +41,11 @@ void adds_imm(int rdn, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (ADDS_IMM_OPCODE << ADDS_IMM_OPCODE_OFFSET) | (rdn << 8) | (imm);
     add_armv6m_inst(op, code_func);
-    printf("adds_imm: "); print_op_machine_code(&op);
 }
 void mov(int rd, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (MOV_OPCODE << MOV_OPCODE_OFFSET) | (rd << 8) | (imm);
     add_armv6m_inst(op, code_func);
-    printf("mov: "); print_op_machine_code(&op);
 }
 void lsls(int rd, int rm, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
@@ -107,6 +105,7 @@ int arg_to_rX(IRValue *arg, int r, MachineCodeFunction *code_func) {
         }
         case irv_immediate: {
             immediate_to_rX(arg->immediate_value, r, code_func);
+            return r;
         }
         // default: PANIC("UNHANDLED IR VALUE: %d\n", arg->type);
     }
@@ -195,15 +194,15 @@ void print_uint16_t_binary(uint16_t i) {
     printf("%d", (i & 0x8000) >> 15);
     printf("%d", (i & 0x4000) >> 14);
     printf("%d", (i & 0x2000) >> 13);
-    printf("%d", (i & 0x1000) >> 12);
+    printf("%d ", (i & 0x1000) >> 12);
     printf("%d", (i & 0x800) >> 11);
     printf("%d", (i & 0x400) >> 10);
     printf("%d", (i & 0x200) >> 9);
-    printf("%d", (i & 0x100) >> 8);
+    printf("%d ", (i & 0x100) >> 8);
     printf("%d", (i & 0x80) >> 7);
     printf("%d", (i & 0x40) >> 6);
     printf("%d", (i & 0x20) >> 5);
-    printf("%d", (i & 0x10) >> 4);
+    printf("%d ", (i & 0x10) >> 4);
     printf("%d", (i & 0x8) >> 3);
     printf("%d", (i & 0x4) >> 2);
     printf("%d", (i & 0x2) >> 1);
@@ -225,7 +224,7 @@ void print_op_machine_code(ARMv6Op *op) {
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> ADDS_IMM_OPCODE_OFFSET) == ADDS_IMM_OPCODE) {
         printf(
-            "ADDS R%d, #%d          ",
+            "ADDS R%d, #0x%x        ",
             (op->code & 0b0000011100000000) >> 8,
             (op->code & 0b0000000011111111) >> 0
         );

@@ -12,12 +12,12 @@ typedef struct _ARMv6Op {
 } ARMv6Op;
 
 typedef struct _MachineCodeFunction {
-    ARMv6Op ops[1024];
+    ARMv6Op ops[512];
     int len;
 } MachineCodeFunction;
 
 typedef struct _MachineCode {
-    MachineCodeFunction functions[64];
+    MachineCodeFunction functions[16];
 } MachineCode;
 
 void ir_to_armv6m(SymbolTable *symbols, MachineCode *code);
