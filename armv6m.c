@@ -2,23 +2,30 @@
 #include "common.h"
 #include "ir.h"
 #include "symbols.h"
+#include <stdlib.h>
 
 #define R_ARG1 0
-#define R_ARG2 1 // could probably combine arg2 and dest registers
-#define R_DEST 2
-#define R_SCRATCH 3
-#define R_TEMP_OFFSET 4
+#define R_ARG2_DEST 1 // could probably combine arg2 and dest registers
+#define R_TEMP_OFFSET 2
 
 #define ADDS_OPCODE 0b000110
-#define MOV_OPCODE0 0b001000
-#define MOV_OPCODE1 0b001001
-#define LSLS_OPCODE0 0b000000
-#define LSLS_OPCODE1 0b000001
-#define DATA_OPCODE 0b010000
-#define DATA_ANDS_OPCODE 0b0000
-#define STR_OPCODE 0b0101000
-#define STRH_OPCODE 0b0101001
-#define STRB_OPCODE 0b0101010
+#define ADDS_OPCODE_OFFSET 10
+#define ADDS_IMM_OPCODE 0b00110
+#define ADDS_IMM_OPCODE_OFFSET 11
+#define MOV_OPCODE 0b00100
+#define MOV_OPCODE_OFFSET 11
+#define LSLS_OPCODE 0b00000
+#define LSLS_OPCODE_OFFSET 11
+#define ANDS_OPCODE 0b0100000000
+#define ANDS_OPCODE_OFFSET 6
+#define STR_OPCODE 0b01100
+#define STR_OPCODE_OFFSET 11
+#define STRH_OPCODE 0b10000
+#define STRH_OPCODE_OFFSET 11
+#define STRB_OPCODE 0b01110
+#define STRB_OPCODE_OFFSET 11
+
+void print_op_machine_code(ARMv6Op *op);
 
 void add_armv6m_inst(ARMv6Op op, MachineCodeFunction *code_func) {
     code_func->ops[code_func->len] = op;
@@ -27,37 +34,44 @@ void add_armv6m_inst(ARMv6Op op, MachineCodeFunction *code_func) {
 
 void adds(int rd, int rn, int rm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
-    op.code = (ADDS_OPCODE << 10) | (rm << 6) | (rn << 3) | (rd);
+    op.code = (ADDS_OPCODE << ADDS_OPCODE_OFFSET) | (rm << 6) | (rn << 3) | (rd);
     add_armv6m_inst(op, code_func);
+}
+void adds_imm(int rdn, int imm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (ADDS_IMM_OPCODE << ADDS_IMM_OPCODE_OFFSET) | (rdn << 8) | (imm);
+    add_armv6m_inst(op, code_func);
+    printf("adds_imm: "); print_op_machine_code(&op);
 }
 void mov(int rd, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
-    op.code = (MOV_OPCODE0 << 10) | (rd << 8) | (imm);
+    op.code = (MOV_OPCODE << MOV_OPCODE_OFFSET) | (rd << 8) | (imm);
     add_armv6m_inst(op, code_func);
+    printf("mov: "); print_op_machine_code(&op);
 }
 void lsls(int rd, int rm, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
-    op.code = (LSLS_OPCODE0 << 10) | (imm << 6) | (rm << 3) | (rd);
+    op.code = (LSLS_OPCODE << LSLS_OPCODE_OFFSET) | (imm << 6) | (rm << 3) | (rd);
     add_armv6m_inst(op, code_func);
 }
 void ands(int rd, int rm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
-    op.code = (DATA_OPCODE << 10) | (DATA_ANDS_OPCODE << 6) | (rm << 3) | (rd);
+    op.code = (ANDS_OPCODE << ANDS_OPCODE_OFFSET) | (rm << 3) | (rd);
     add_armv6m_inst(op, code_func);
 }
-void str(int rt, int rn, int rm, MachineCodeFunction *code_func) {
+void str(int rt, int rn, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
-    op.code = (STR_OPCODE << 9) | (rm << 6) | (rn << 3) | (rt);
+    op.code = (STR_OPCODE << STR_OPCODE_OFFSET) | (imm << 6) | (rn << 3) | (rt);
     add_armv6m_inst(op, code_func);
 }
-void strb(int rt, int rn, int rm, MachineCodeFunction *code_func) {
+void strh(int rt, int rn, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
-    op.code = (STRB_OPCODE << 9) | (rm << 6) | (rn << 3) | (rt);
+    op.code = (STRH_OPCODE << STRH_OPCODE_OFFSET) | (imm << 6) | (rn << 3) | (rt);
     add_armv6m_inst(op, code_func);
 }
-void strh(int rt, int rn, int rm, MachineCodeFunction *code_func) {
+void strb(int rt, int rn, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
-    op.code = (STRH_OPCODE << 9) | (rm << 6) | (rn << 3) | (rt);
+    op.code = (STRB_OPCODE << STRB_OPCODE_OFFSET) | (imm << 6) | (rn << 3) | (rt);
     add_armv6m_inst(op, code_func);
 }
 
@@ -67,27 +81,21 @@ void immediate_to_rX(int imm, int r, MachineCodeFunction *code_func) {
     } else if (imm <= 0xFFFF) {
         mov(r, (imm & 0xFF00) >> 8, code_func);
         lsls(r, r, 8, code_func);
-        mov(R_SCRATCH, imm & 0xFF, code_func);
-        ands(r, R_SCRATCH, code_func);
+        adds_imm(r, imm & 0xFF, code_func);
     } else if (imm <= 0xFFFFFF) {
         mov(r, (imm & 0xFF0000) >> 16, code_func);
         lsls(r, r, 8, code_func);
-        mov(R_SCRATCH, (imm & 0xFF00) >> 8, code_func);
-        ands(r, R_SCRATCH, code_func);
+        adds_imm(r, (imm & 0xFF00) >> 8, code_func);
         lsls(r, r, 8, code_func);
-        mov(R_SCRATCH, imm & 0xFF, code_func);
-        ands(r, R_SCRATCH, code_func);
+        adds_imm(r, imm & 0xFF, code_func);
     } else if (imm <= 0xFFFFFFFF) {
         mov(r, (imm & 0xFF000000) >> 24, code_func);
         lsls(r, r, 8, code_func);
-        mov(R_SCRATCH, (imm & 0xFF0000) >> 16, code_func);
-        ands(r, R_SCRATCH, code_func);
+        adds_imm(r, (imm & 0xFF0000) >> 16, code_func);
         lsls(r, r, 8, code_func);
-        mov(R_SCRATCH, (imm & 0xFF00) >> 8, code_func);
-        ands(r, R_SCRATCH, code_func);
+        adds_imm(r, (imm & 0xFF00) >> 8, code_func);
         lsls(r, r, 8, code_func);
-        mov(R_SCRATCH, imm & 0xFF, code_func);
-        ands(r, R_SCRATCH, code_func);
+        adds_imm(r, imm & 0xFF, code_func);
     }
 }
 
@@ -119,7 +127,7 @@ void rx_to_result(SymbolTable *symbols, IRValue *result, int r, MachineCodeFunct
         }
         case irv_mmp_struct_item: {
             StructItem *si = &symbols->struct_items[result->mmp_struct_item_index];
-            immediate_to_rX(si->address, R_DEST, code_func);
+            immediate_to_rX(si->address, R_ARG2_DEST, code_func);
             int width = 0;
             if (si->type == si_bf) {
                 width = si->bf.width;
@@ -131,11 +139,11 @@ void rx_to_result(SymbolTable *symbols, IRValue *result, int r, MachineCodeFunct
                 width = 32;
             }
             if (width == 8) {
-                strb(r, R_DEST, 0, code_func);
+                strb(r, R_ARG2_DEST, 0, code_func);
             } else if (width == 16) {
-                strh(r, R_DEST, 0, code_func);
+                strh(r, R_ARG2_DEST, 0, code_func);
             } else if (width == 32) {
-                str(r, R_DEST, 0, code_func);
+                str(r, R_ARG2_DEST, 0, code_func);
             } else {
                 PANIC("INVALID WIDTH OF STRUCT ITEM\n");
             }
@@ -149,7 +157,7 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
     switch (ir_op->opcode) {
         case ir_add: {
             int rn = arg_to_rX(&ir_op->arg1, R_ARG1, code_func);
-            int rm = arg_to_rX(&ir_op->arg2, R_ARG2, code_func);
+            int rm = arg_to_rX(&ir_op->arg2, R_ARG2_DEST, code_func);
             int rd = result_rx(&ir_op->result);
             adds(rd, rn, rm, code_func);
             rx_to_result(symbols, &ir_op->result, rd, code_func);
@@ -207,58 +215,69 @@ void print_op_machine_code(ARMv6Op *op) {
     } else {
         printf("    ");
     }
-    switch ((op->code >> 10) & 0b111111) {
-        case ADDS_OPCODE:
-            printf(
-                "ADDS R%d, R%d, R%d",
-                (op->code & 0b0000000000000111) >> 0,
-                (op->code & 0b0000000000111000) >> 3,
-                (op->code & 0b0000000111000000) >> 6
-            );
-            printf("\t(");
-            print_uint16_t_binary(op->code);
-            printf(")\n");
-            break;
-        case MOV_OPCODE0:
-        case MOV_OPCODE1:
-            printf(
-                "MOV R%d, #0x%x",
-                (op->code & 0b0000011100000000) >> 8,
-                (op->code & 0b0000000011111111) >> 0
-            );
-            printf("\t(");
-            print_uint16_t_binary(op->code);
-            printf(")\n");
-            break;
-        case LSLS_OPCODE0:
-        case LSLS_OPCODE1:
-            printf(
-                "LSLS R%d, R%d, #0x%x",
-                (op->code & 0b0000000000000111) >> 0,
-                (op->code & 0b0000000000111000) >> 3,
-                (op->code & 0b0000011111000000) >> 6
-            );
-            printf("\t(");
-            print_uint16_t_binary(op->code);
-            printf(")\n");
-            break;
-        case DATA_OPCODE: {
-            switch ((op->code >> 6) & 0b1111) {
-                case DATA_ANDS_OPCODE:
-                    printf(
-                        "ANDS R%d, R%d",
-                        (op->code & 0b0000000000000111) >> 0,
-                        (op->code & 0b0000000000111000) >> 3
-                    );
-                    printf("\t(");
-                    print_uint16_t_binary(op->code);
-                    printf(")\n");
-                    break;
-                default: PANIC("UNIDENTIFIED ARMv6-M DATA OPCODE: %x\n", op->code);
-            }
-            break;
-        }
-        default: PANIC("UNIDENTIFIED ARMv6-M OPCODE: %x\n", op->code);
+    if ((op->code >> ADDS_OPCODE_OFFSET) == ADDS_OPCODE) {
+        printf(
+            "ADDS R%d, R%d, R%d      ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3,
+            (op->code & 0b0000000111000000) >> 6
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> ADDS_IMM_OPCODE_OFFSET) == ADDS_IMM_OPCODE) {
+        printf(
+            "ADDS R%d, #%d          ",
+            (op->code & 0b0000011100000000) >> 8,
+            (op->code & 0b0000000011111111) >> 0
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> MOV_OPCODE_OFFSET) == MOV_OPCODE) {
+        printf(
+            "MOV R%d, #0x%x         ",
+            (op->code & 0b0000011100000000) >> 8,
+            (op->code & 0b0000000011111111) >> 0
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> LSLS_OPCODE_OFFSET) == LSLS_OPCODE) {
+        printf(
+            "LSLS R%d, R%d, #0x%x    ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3,
+            (op->code & 0b0000011111000000) >> 6
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> ANDS_OPCODE_OFFSET) == ANDS_OPCODE) {
+        printf(
+            "ANDS R%d, R%d          ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> STR_OPCODE_OFFSET) == STR_OPCODE) {
+        printf(
+            "STR R%d, [R%d + #0x%x]  ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3,
+            (op->code & 0b0000011111000000) >> 6
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> STRH_OPCODE_OFFSET) == STRH_OPCODE) {
+        printf(
+            "STRH R%d, [R%d + #0x%x] ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3,
+            (op->code & 0b0000011111000000) >> 6
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> STRB_OPCODE_OFFSET) == STRB_OPCODE) {
+        printf(
+            "STRB R%d, [R%d + #0x%x] ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3,
+            (op->code & 0b0000011111000000) >> 6
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else {
+        PANIC("UNIDENTIFIED ARMv6-M OPCODE: %x\n", op->code);
     }
 }
 void print_function_machine_code(SymbolTable *symbols, MachineCodeFunction *code_func, int func_index) {
