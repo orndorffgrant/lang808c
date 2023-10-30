@@ -121,9 +121,12 @@ void rx_to_result(SymbolTable *symbols, IRValue *result, int r, MachineCodeFunct
         case irv_temp: {
             return;
         }
-        case irv_immediate: {
+        case irv_immediate:
             PANIC("IR RESULT CAN'T BE IMMEDIATE");
-        }
+        case irv_function:
+            PANIC("IR RESULT CAN'T BE FUNCTION");
+        case irv_function_argument:
+            PANIC("IR RESULT CAN'T BE FUNCTION ARGUMENT");
         case irv_mmp_struct_item: {
             StructItem *si = &symbols->struct_items[result->mmp_struct_item_index];
             immediate_to_rX(si->address, R_ARG2_DEST, code_func);
@@ -145,6 +148,20 @@ void rx_to_result(SymbolTable *symbols, IRValue *result, int r, MachineCodeFunct
                 str(r, R_ARG2_DEST, 0, code_func);
             } else {
                 PANIC("INVALID WIDTH OF STRUCT ITEM\n");
+            }
+            return;
+        }
+        case irv_static_variable: {
+            Variable *var = &symbols->static_vars[result->static_variable_index];
+            immediate_to_rX(var->address, R_ARG2_DEST, code_func);
+            if (var->int_type == int_u8) {
+                strb(r, R_ARG2_DEST, 0, code_func);
+            } else if (var->int_type == int_u16) {
+                strh(r, R_ARG2_DEST, 0, code_func);
+            } else if (var->int_type == int_u32) {
+                str(r, R_ARG2_DEST, 0, code_func);
+            } else {
+                PANIC("INVALID INT TYPE OF STATIC VARIABLE\n");
             }
             return;
         }
