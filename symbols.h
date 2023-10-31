@@ -80,6 +80,7 @@ typedef struct _Variable {
     StringRef name;
     IntType int_type;
     int initial_value;
+    int address; // used for static variables
 } Variable;
 
 // A struct representing one argument to a function

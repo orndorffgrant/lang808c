@@ -912,6 +912,9 @@ int function(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
 
 // parse a static (global) variable, e.g "static u32 global = 45;"
 // put the variable in the symbol table
+// assign it an address
+static int next_static_var_address = RAM_BASE_ADDRESS;
+
 int static_var(Token *tokens, int next_token, SymbolTable *symbols, int indent) {
     PARSE_TREE_INDENT(indent); indent++; PARSE_TREE_PRINT("- StaticVariable:\n");
     Variable var;
@@ -922,6 +925,9 @@ int static_var(Token *tokens, int next_token, SymbolTable *symbols, int indent) 
     next_token = match(t_equals, tokens, next_token, indent);
     next_token = match_intliteral(tokens, next_token, &var.initial_value, indent);
     next_token = match(t_semicolon, tokens, next_token, indent);
+
+    var.address = next_static_var_address;
+    next_static_var_address += 4;
 
     int index = add_static_variable(symbols, var);
 

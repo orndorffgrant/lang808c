@@ -13,6 +13,8 @@
 
 #define INIT_FUNC_INDEX 0
 
+#define RAM_BASE_ADDRESS 0x20000000
+
 void parse(Token *tokens, int token_num, SymbolTable *symbols);
 
 #endif
