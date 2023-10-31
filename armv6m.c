@@ -29,6 +29,12 @@
 #define STRH_OPCODE_OFFSET 11
 #define STRB_OPCODE 0b01110
 #define STRB_OPCODE_OFFSET 11
+#define LDR_OPCODE 0b01101
+#define LDR_OPCODE_OFFSET 11
+#define LDRH_OPCODE 0b10001
+#define LDRH_OPCODE_OFFSET 11
+#define LDRB_OPCODE 0b01111
+#define LDRB_OPCODE_OFFSET 11
 
 void print_op_machine_code(ARMv6Op *op);
 
@@ -89,6 +95,21 @@ void strb(int rt, int rn, int imm, MachineCodeFunction *code_func) {
     op.code = (STRB_OPCODE << STRB_OPCODE_OFFSET) | (imm << 6) | (rn << 3) | (rt);
     add_armv6m_inst(op, code_func);
 }
+void ldr(int rt, int rn, int imm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (LDR_OPCODE << LDR_OPCODE_OFFSET) | (imm << 6) | (rn << 3) | (rt);
+    add_armv6m_inst(op, code_func);
+}
+void ldrh(int rt, int rn, int imm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (LDRH_OPCODE << LDRH_OPCODE_OFFSET) | (imm << 6) | (rn << 3) | (rt);
+    add_armv6m_inst(op, code_func);
+}
+void ldrb(int rt, int rn, int imm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (LDRB_OPCODE << LDRB_OPCODE_OFFSET) | (imm << 6) | (rn << 3) | (rt);
+    add_armv6m_inst(op, code_func);
+}
 
 void immediate_to_rX(int imm, int r, MachineCodeFunction *code_func) {
     if (imm <= 0xFF) {
@@ -115,7 +136,7 @@ void immediate_to_rX(int imm, int r, MachineCodeFunction *code_func) {
 }
 
 // Returns register that will have the arg value
-int arg_to_rX(IRValue *arg, int r, MachineCodeFunction *code_func) {
+int arg_to_rX(SymbolTable *symbols, IRValue *arg, int r, MachineCodeFunction *code_func) {
     switch (arg->type) {
         case irv_temp: {
             return arg->temp_num + R_TEMP_OFFSET;
@@ -124,7 +145,23 @@ int arg_to_rX(IRValue *arg, int r, MachineCodeFunction *code_func) {
             immediate_to_rX(arg->immediate_value, r, code_func);
             return r;
         }
-        // default: PANIC("UNHANDLED IR VALUE: %d\n", arg->type);
+        case irv_function:
+            PANIC("IR NON-FUNCTION ARG CAN'T BE FUNCTION");
+        case irv_static_variable: {
+            Variable *var = &symbols->static_vars[arg->static_variable_index];
+            immediate_to_rX(var->address, r, code_func);
+            if (var->int_type == int_u8) {
+                ldrb(r, r, 0, code_func);
+            } else if (var->int_type == int_u16) {
+                ldrh(r, r, 0, code_func);
+            } else if (var->int_type == int_u32) {
+                ldr(r, r, 0, code_func);
+            } else {
+                PANIC("INVALID INT TYPE OF STATIC VARIABLE\n");
+            }
+            return r;
+        }
+        // default: PANIC("UNHANDLED ARG IR VALUE: %d\n", arg->type);
     }
 }
 int result_rx(IRValue *result) {
@@ -200,15 +237,15 @@ void rx_to_result(SymbolTable *symbols, IRValue *result, int r, MachineCodeFunct
             }
             return;
         }
-        //default: PANIC("UNHANDLED IR VALUE: %d\n", result->type);
+        default: PANIC("UNHANDLED RESULT IR VALUE: %d\n", result->type);
     }
 }
 
 void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *code_func) {
     switch (ir_op->opcode) {
         case ir_add: {
-            int rn = arg_to_rX(&ir_op->arg1, R_ARG1, code_func);
-            int rm = arg_to_rX(&ir_op->arg2, R_ARG2_DEST, code_func);
+            int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
+            int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
             int rd = result_rx(&ir_op->result);
             adds(rd, rn, rm, code_func);
             rx_to_result(symbols, &ir_op->result, rd, code_func);
@@ -217,9 +254,9 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
         case ir_copy: {
             if (ir_op->result.type == irv_temp) {
                 int rd = result_rx(&ir_op->result);
-                int rn = arg_to_rX(&ir_op->arg1, rd, code_func);
+                int rn = arg_to_rX(symbols, &ir_op->arg1, rd, code_func);
             } else {
-                int rn = arg_to_rX(&ir_op->arg1, R_ARG1, code_func);
+                int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
                 rx_to_result(symbols, &ir_op->result, rn, code_func);
             }
             break;
@@ -339,6 +376,30 @@ void print_op_machine_code(ARMv6Op *op) {
     } else if ((op->code >> STRB_OPCODE_OFFSET) == STRB_OPCODE) {
         printf(
             "STRB R%d, [R%d + #0x%x] ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3,
+            (op->code & 0b0000011111000000) >> 6
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> LDR_OPCODE_OFFSET) == LDR_OPCODE) {
+        printf(
+            "LDR R%d, [R%d + #0x%x]  ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3,
+            (op->code & 0b0000011111000000) >> 6
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> LDRH_OPCODE_OFFSET) == LDRH_OPCODE) {
+        printf(
+            "LDRH R%d, [R%d + #0x%x] ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3,
+            (op->code & 0b0000011111000000) >> 6
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> LDRB_OPCODE_OFFSET) == LDRB_OPCODE) {
+        printf(
+            "LDRB R%d, [R%d + #0x%x] ",
             (op->code & 0b0000000000000111) >> 0,
             (op->code & 0b0000000000111000) >> 3,
             (op->code & 0b0000011111000000) >> 6
