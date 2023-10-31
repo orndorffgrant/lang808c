@@ -7,13 +7,18 @@
 #define R_ARG1 0
 #define R_ARG2_DEST 1 // could probably combine arg2 and dest registers
 #define R_TEMP_OFFSET 2
+#define R_SP 13
 
 #define ADDS_OPCODE 0b000110
 #define ADDS_OPCODE_OFFSET 10
 #define ADDS_IMM_OPCODE 0b00110
 #define ADDS_IMM_OPCODE_OFFSET 11
+#define SUBS_IMM_OPCODE 0b00111
+#define SUBS_IMM_OPCODE_OFFSET 11
 #define MOV_OPCODE 0b00100
 #define MOV_OPCODE_OFFSET 11
+#define MOV_R_OPCODE 0b01000110
+#define MOV_R_OPCODE_OFFSET 8
 #define LSLS_OPCODE 0b00000
 #define LSLS_OPCODE_OFFSET 11
 #define ANDS_OPCODE 0b0100000000
@@ -42,9 +47,21 @@ void adds_imm(int rdn, int imm, MachineCodeFunction *code_func) {
     op.code = (ADDS_IMM_OPCODE << ADDS_IMM_OPCODE_OFFSET) | (rdn << 8) | (imm);
     add_armv6m_inst(op, code_func);
 }
+void subs_imm(int rdn, int imm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (SUBS_IMM_OPCODE << SUBS_IMM_OPCODE_OFFSET) | (rdn << 8) | (imm);
+    add_armv6m_inst(op, code_func);
+}
 void mov(int rd, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (MOV_OPCODE << MOV_OPCODE_OFFSET) | (rd << 8) | (imm);
+    add_armv6m_inst(op, code_func);
+}
+void mov_r(int rd, int rm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    int D = (rd & 0x8) >> 3;
+    int rd_short = rd & 0x7;
+    op.code = (MOV_R_OPCODE << MOV_R_OPCODE_OFFSET) | (D << 7) | (rm << 3) | (rd_short);
     add_armv6m_inst(op, code_func);
 }
 void lsls(int rd, int rm, int imm, MachineCodeFunction *code_func) {
@@ -165,6 +182,24 @@ void rx_to_result(SymbolTable *symbols, IRValue *result, int r, MachineCodeFunct
             }
             return;
         }
+        case irv_local_variable: {
+            Function *func = &symbols->functions[result->func_index];
+            Variable *var = &symbols->function_vars[result->local_variable_index];
+            int local_var_num = result->local_variable_index - func->func_vars_index;
+            int sp_offset = (local_var_num + 1) * 4;
+            mov_r(R_ARG2_DEST, R_SP, code_func);
+            subs_imm(R_ARG2_DEST, sp_offset, code_func);
+            if (var->int_type == int_u8) {
+                strb(r, R_ARG2_DEST, 0, code_func);
+            } else if (var->int_type == int_u16) {
+                strh(r, R_ARG2_DEST, 0, code_func);
+            } else if (var->int_type == int_u32) {
+                str(r, R_ARG2_DEST, 0, code_func);
+            } else {
+                PANIC("INVALID INT TYPE OF STATIC VARIABLE\n");
+            }
+            return;
+        }
         //default: PANIC("UNHANDLED IR VALUE: %d\n", result->type);
     }
 }
@@ -246,11 +281,28 @@ void print_op_machine_code(ARMv6Op *op) {
             (op->code & 0b0000000011111111) >> 0
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> SUBS_IMM_OPCODE_OFFSET) == SUBS_IMM_OPCODE) {
+        printf(
+            "SUBS R%d, #0x%x        ",
+            (op->code & 0b0000011100000000) >> 8,
+            (op->code & 0b0000000011111111) >> 0
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> MOV_OPCODE_OFFSET) == MOV_OPCODE) {
         printf(
             "MOV R%d, #0x%x         ",
             (op->code & 0b0000011100000000) >> 8,
             (op->code & 0b0000000011111111) >> 0
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> MOV_R_OPCODE_OFFSET) == MOV_R_OPCODE) {
+        int D = ((op->code & 0b10000000) >> 4);
+        int rd_short = op->code & 0b111;
+        int rd = D | rd_short;
+        printf(
+            "MOV R%d, R%d           ",
+            rd,
+            (op->code & 0b0000000001111000) >> 3
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> LSLS_OPCODE_OFFSET) == LSLS_OPCODE) {

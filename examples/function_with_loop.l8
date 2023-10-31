@@ -11,7 +11,7 @@ fun calculate_value(times: u32): u32 {
   u32 i = 0;
   while (i < times) {
     # This updates the local variable "value" with the
-    # expression "value + 1 << 30"
+    # expression "value + 1 << 3"
     value = value + 1 << 3;
     i = i + 1;
   }

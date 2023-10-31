@@ -80,6 +80,7 @@ struct NameResolutionResult {
     int si_index;
     int func_arg_index;
     int local_var_index;
+    int func_index;
     int static_var_index;
 };
 // parse a "Name" which can be "id" if its a variable, or "id.id" if its a field on a peripheral
@@ -111,11 +112,13 @@ int name(Token *tokens, int next_token, SymbolTable *symbols, int func_index, st
         result->func_arg_index = find_function_arg(symbols, func_index, &first_name);
         if (result->func_arg_index > -1) {
             result->result = name_func_arg;
+            result->func_index = func_index;
             return next_token;
         } 
         result->local_var_index = find_function_variable(symbols, func_index, &first_name);
         if (result->local_var_index > -1) {
             result->result = name_local_var;
+            result->func_index = func_index;
             return next_token;
         } 
         result->static_var_index = find_static_variable(symbols, &first_name);
@@ -192,9 +195,11 @@ int expression_term(Token *tokens, int next_token, SymbolTable *symbols, int fun
         } else if (name_result.result == name_func_arg) {
             op.arg1.type = irv_function_argument;
             op.arg1.func_arg_index = name_result.func_arg_index;
+            op.arg1.func_index = name_result.func_index;
         } else if (name_result.result == name_local_var) {
             op.arg1.type = irv_local_variable;
             op.arg1.local_variable_index = name_result.local_var_index;
+            op.arg1.func_index = name_result.func_index;
         } else if (name_result.result == name_static_var) {
             op.arg1.type = irv_static_variable;
             op.arg1.static_variable_index = name_result.static_var_index;
@@ -635,9 +640,11 @@ int function_statement_assignment(Token *tokens, int next_token, SymbolTable *sy
     } else if (name_result.result == name_func_arg) {
         op.result.type = irv_function_argument;
         op.result.func_arg_index = name_result.func_arg_index;
+        op.result.func_index = name_result.func_index;
     } else if (name_result.result == name_local_var) {
         op.result.type = irv_local_variable;
         op.result.local_variable_index = name_result.local_var_index;
+        op.result.func_index = name_result.func_index;
     } else if (name_result.result == name_static_var) {
         op.result.type = irv_static_variable;
         op.result.static_variable_index = name_result.static_var_index;
@@ -760,6 +767,7 @@ int function_statement_local_var(Token *tokens, int next_token, SymbolTable *sym
     op.opcode = ir_copy;
     op.result.type = irv_local_variable;
     op.result.local_variable_index = var_index;
+    op.result.func_index = func_index;
     op.arg1.type = irv_immediate;
     op.arg1.immediate_value = var.initial_value;
     add_function_ir(symbols, func_index, op);
