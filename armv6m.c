@@ -147,6 +147,30 @@ int arg_to_rX(SymbolTable *symbols, IRValue *arg, int r, MachineCodeFunction *co
         }
         case irv_function:
             PANIC("IR NON-FUNCTION ARG CAN'T BE FUNCTION");
+        case irv_mmp_struct_item: {
+            StructItem *si = &symbols->struct_items[arg->mmp_struct_item_index];
+            immediate_to_rX(si->address, R_ARG2_DEST, code_func);
+            int width = 0;
+            if (si->type == si_bf) {
+                width = si->bf.width;
+            } else if (si->int_type == int_u8) {
+                width = 8;
+            } else if (si->int_type == int_u16) {
+                width = 16;
+            } else if (si->int_type == int_u32) {
+                width = 32;
+            }
+            if (width == 8) {
+                ldrb(r, R_ARG2_DEST, 0, code_func);
+            } else if (width == 16) {
+                ldrh(r, R_ARG2_DEST, 0, code_func);
+            } else if (width == 32) {
+                ldr(r, R_ARG2_DEST, 0, code_func);
+            } else {
+                PANIC("INVALID WIDTH OF STRUCT ITEM\n");
+            }
+            return r;
+        }
         case irv_static_variable: {
             Variable *var = &symbols->static_vars[arg->static_variable_index];
             immediate_to_rX(var->address, r, code_func);
@@ -161,7 +185,42 @@ int arg_to_rX(SymbolTable *symbols, IRValue *arg, int r, MachineCodeFunction *co
             }
             return r;
         }
-        // default: PANIC("UNHANDLED ARG IR VALUE: %d\n", arg->type);
+        case irv_local_variable: {
+            Function *func = &symbols->functions[arg->func_index];
+            Variable *var = &symbols->function_vars[arg->local_variable_index];
+            int local_var_num = arg->local_variable_index - func->func_vars_index;
+            int sp_offset = (local_var_num + 1) * 4;
+            mov_r(R_ARG2_DEST, R_SP, code_func);
+            subs_imm(R_ARG2_DEST, sp_offset, code_func);
+            if (var->int_type == int_u8) {
+                ldrb(r, R_ARG2_DEST, 0, code_func);
+            } else if (var->int_type == int_u16) {
+                ldrh(r, R_ARG2_DEST, 0, code_func);
+            } else if (var->int_type == int_u32) {
+                ldr(r, R_ARG2_DEST, 0, code_func);
+            } else {
+                PANIC("INVALID INT TYPE OF STATIC VARIABLE\n");
+            }
+            return r;
+        }
+        case irv_function_argument: {
+            Function *func = &symbols->functions[arg->func_index];
+            FunctionArg *func_arg = &symbols->func_args[arg->func_arg_index];
+            int func_arg_num = arg->func_arg_index - func->func_args_index;
+            int sp_offset = func_arg_num * 4;
+            mov_r(R_ARG2_DEST, R_SP, code_func);
+            if (func_arg->int_type == int_u8) {
+                ldrb(r, R_ARG2_DEST, sp_offset, code_func);
+            } else if (func_arg->int_type == int_u16) {
+                ldrh(r, R_ARG2_DEST, sp_offset, code_func);
+            } else if (func_arg->int_type == int_u32) {
+                ldr(r, R_ARG2_DEST, sp_offset, code_func);
+            } else {
+                PANIC("INVALID INT TYPE OF STATIC VARIABLE\n");
+            }
+            return r;
+        }
+        default: PANIC("UNHANDLED ARG IR VALUE: %d\n", arg->type);
     }
 }
 int result_rx(IRValue *result) {
