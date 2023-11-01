@@ -9,10 +9,12 @@
 #define R_TEMP_OFFSET 2
 #define R_SP 13
 
-#define ADDS_OPCODE 0b000110
-#define ADDS_OPCODE_OFFSET 10
+#define ADDS_OPCODE 0b0001100
+#define ADDS_OPCODE_OFFSET 9
 #define ADDS_IMM_OPCODE 0b00110
 #define ADDS_IMM_OPCODE_OFFSET 11
+#define SUBS_OPCODE 0b0001101
+#define SUBS_OPCODE_OFFSET 9
 #define SUBS_IMM_OPCODE 0b00111
 #define SUBS_IMM_OPCODE_OFFSET 11
 #define MOV_OPCODE 0b00100
@@ -21,6 +23,8 @@
 #define MOV_R_OPCODE_OFFSET 8
 #define LSLS_OPCODE 0b00000
 #define LSLS_OPCODE_OFFSET 11
+#define LSLS_R_OPCODE 0b0100000010
+#define LSLS_R_OPCODE_OFFSET 6
 #define ANDS_OPCODE 0b0100000000
 #define ANDS_OPCODE_OFFSET 6
 #define STR_OPCODE 0b01100
@@ -53,6 +57,11 @@ void adds_imm(int rdn, int imm, MachineCodeFunction *code_func) {
     op.code = (ADDS_IMM_OPCODE << ADDS_IMM_OPCODE_OFFSET) | (rdn << 8) | (imm);
     add_armv6m_inst(op, code_func);
 }
+void subs(int rd, int rn, int rm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (SUBS_OPCODE << SUBS_OPCODE_OFFSET) | (rm << 6) | (rn << 3) | (rd);
+    add_armv6m_inst(op, code_func);
+}
 void subs_imm(int rdn, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (SUBS_IMM_OPCODE << SUBS_IMM_OPCODE_OFFSET) | (rdn << 8) | (imm);
@@ -73,6 +82,11 @@ void mov_r(int rd, int rm, MachineCodeFunction *code_func) {
 void lsls(int rd, int rm, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (LSLS_OPCODE << LSLS_OPCODE_OFFSET) | (imm << 6) | (rm << 3) | (rd);
+    add_armv6m_inst(op, code_func);
+}
+void lsls_r(int rdn, int rm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (LSLS_R_OPCODE << LSLS_R_OPCODE_OFFSET) | (rm << 3) | (rdn);
     add_armv6m_inst(op, code_func);
 }
 void ands(int rd, int rm, MachineCodeFunction *code_func) {
@@ -310,6 +324,27 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
             rx_to_result(symbols, &ir_op->result, rd, code_func);
             break;
         }
+        case ir_subtract: {
+            int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
+            int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
+            int rd = result_rx(&ir_op->result);
+            subs(rd, rn, rm, code_func);
+            rx_to_result(symbols, &ir_op->result, rd, code_func);
+            break;
+        }
+        case ir_shift_left: {
+            int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
+            int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
+            int rd = result_rx(&ir_op->result);
+            if (rd != rn) {
+                lsls_r(rn, rm, code_func);
+                mov_r(rd, rn, code_func);
+            } else {
+                lsls_r(rd, rm, code_func);
+            }
+            rx_to_result(symbols, &ir_op->result, rd, code_func);
+            break;
+        }
         case ir_copy: {
             if (ir_op->result.type == irv_temp) {
                 int rd = result_rx(&ir_op->result);
@@ -377,6 +412,14 @@ void print_op_machine_code(ARMv6Op *op) {
             (op->code & 0b0000000011111111) >> 0
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> SUBS_OPCODE_OFFSET) == SUBS_OPCODE) {
+        printf(
+            "SUBS R%d, R%d, R%d      ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3,
+            (op->code & 0b0000000111000000) >> 6
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> SUBS_IMM_OPCODE_OFFSET) == SUBS_IMM_OPCODE) {
         printf(
             "SUBS R%d, #0x%x        ",
@@ -407,6 +450,13 @@ void print_op_machine_code(ARMv6Op *op) {
             (op->code & 0b0000000000000111) >> 0,
             (op->code & 0b0000000000111000) >> 3,
             (op->code & 0b0000011111000000) >> 6
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> LSLS_R_OPCODE_OFFSET) == LSLS_R_OPCODE) {
+        printf(
+            "LSLS R%d, R%d          ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> ANDS_OPCODE_OFFSET) == ANDS_OPCODE) {
