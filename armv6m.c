@@ -2,6 +2,7 @@
 #include "common.h"
 #include "ir.h"
 #include "symbols.h"
+#include <stdint.h>
 #include <stdlib.h>
 
 #define R_ARG1 0
@@ -39,6 +40,11 @@
 #define LDRH_OPCODE_OFFSET 11
 #define LDRB_OPCODE 0b01111
 #define LDRB_OPCODE_OFFSET 11
+#define CMP_OPCODE 0b0100001010
+#define CMP_OPCODE_OFFSET 6
+#define MRS_INIT 0b1111001111101111
+#define MRS_OPCODE 0b1000
+#define MRS_OPCODE_OFFSET 12
 
 void print_op_machine_code(ARMv6Op *op);
 
@@ -122,6 +128,18 @@ void ldrh(int rt, int rn, int imm, MachineCodeFunction *code_func) {
 void ldrb(int rt, int rn, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (LDRB_OPCODE << LDRB_OPCODE_OFFSET) | (imm << 6) | (rn << 3) | (rt);
+    add_armv6m_inst(op, code_func);
+}
+void cmp(int rm, int rn, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (CMP_OPCODE << CMP_OPCODE_OFFSET) | (rm << 3) | (rn);
+    add_armv6m_inst(op, code_func);
+}
+void mrs(int rd, int spec_reg, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = MRS_INIT;
+    add_armv6m_inst(op, code_func);
+    op.code = (MRS_OPCODE << MRS_OPCODE_OFFSET) | (rd << 8) | (spec_reg);
     add_armv6m_inst(op, code_func);
 }
 
@@ -358,6 +376,16 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
             rx_to_result(symbols, &ir_op->result, rd, code_func);
             break;
         }
+        case ir_equals: {
+            int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
+            int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
+            int rd = result_rx(&ir_op->result);
+            cmp(rn, rm, code_func);
+            mrs(rd, 0, code_func);
+            // TODO mov? (and how will this work with branches?)
+            rx_to_result(symbols, &ir_op->result, rd, code_func);
+            break;
+        }
         case ir_copy: {
             if (ir_op->result.type == irv_temp) {
                 int rd = result_rx(&ir_op->result);
@@ -402,13 +430,29 @@ void print_uint16_t_binary(uint16_t i) {
     printf("%d", (i & 0x2) >> 1);
     printf("%d", i & 0x1);
 }
+uint16_t op_init = 0;
 void print_op_machine_code(ARMv6Op *op) {
     if (op->label != 0) {
         printf("%2d: ", op->label);
     } else {
         printf("    ");
     }
-    if ((op->code >> ADDS_OPCODE_OFFSET) == ADDS_OPCODE) {
+    if (op->code == MRS_INIT) {
+        op_init = MRS_INIT;
+        printf("\r");
+    } else if ((op_init == MRS_INIT) && ((op->code >> MRS_OPCODE_OFFSET) == MRS_OPCODE)) {
+        printf(
+            "MRS R%d, Spec0x%x      ",
+            (op->code & 0b0000111100000000) >> 8,
+            (op->code & 0b0000000011111111) >> 0
+        );
+        printf("\t(");
+        print_uint16_t_binary(MRS_INIT);
+        printf("  ");
+        print_uint16_t_binary(op->code);
+        printf(")\n");
+        op_init = 0;
+    } else if ((op->code >> ADDS_OPCODE_OFFSET) == ADDS_OPCODE) {
         printf(
             "ADDS R%d, R%d, R%d      ",
             (op->code & 0b0000000000000111) >> 0,
@@ -523,6 +567,13 @@ void print_op_machine_code(ARMv6Op *op) {
             (op->code & 0b0000000000000111) >> 0,
             (op->code & 0b0000000000111000) >> 3,
             (op->code & 0b0000011111000000) >> 6
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> CMP_OPCODE_OFFSET) == CMP_OPCODE) {
+        printf(
+            "CMP R%d, R%d           ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else {
