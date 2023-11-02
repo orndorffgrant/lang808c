@@ -345,6 +345,19 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
             rx_to_result(symbols, &ir_op->result, rd, code_func);
             break;
         }
+        case ir_bitwise_and: {
+            int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
+            int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
+            int rd = result_rx(&ir_op->result);
+            if (rd != rn) {
+                ands(rn, rm, code_func);
+                mov_r(rd, rn, code_func);
+            } else {
+                ands(rd, rm, code_func);
+            }
+            rx_to_result(symbols, &ir_op->result, rd, code_func);
+            break;
+        }
         case ir_copy: {
             if (ir_op->result.type == irv_temp) {
                 int rd = result_rx(&ir_op->result);
@@ -355,9 +368,7 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
             }
             break;
         }
-
     }
-
 }
 
 void ir_to_armv6m_function(SymbolTable *symbols, MachineCodeFunction *code_func, int func_index) {
