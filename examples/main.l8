@@ -305,7 +305,7 @@ fun blink_and_update_blink_times(blink_times: u32): u32 {
     if (blink_times == 4) {
         counting_up = 0;
     }
-    if (counting_up) {
+    if (counting_up == 1) {
         new_blink_times = blink_times + 1;
     } else {
         new_blink_times = blink_times - 1;

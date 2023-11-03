@@ -10,6 +10,10 @@
 #define R_TEMP_OFFSET 2
 #define R_SP 13
 
+#define C_ALWAYS 0b1110
+#define C_EQUALS 0b0000
+#define C_LESSTHAN 0b1011
+
 #define ADDS_OPCODE 0b0001100
 #define ADDS_OPCODE_OFFSET 9
 #define ADDS_IMM_OPCODE 0b00110
@@ -45,6 +49,8 @@
 #define MRS_INIT 0b1111001111101111
 #define MRS_OPCODE 0b1000
 #define MRS_OPCODE_OFFSET 12
+#define PUSH_OPCODE 0b1011010
+#define PUSH_OPCODE_OFFSET 9
 
 void print_op_machine_code(ARMv6Op *op);
 
@@ -140,6 +146,11 @@ void mrs(int rd, int spec_reg, MachineCodeFunction *code_func) {
     op.code = MRS_INIT;
     add_armv6m_inst(op, code_func);
     op.code = (MRS_OPCODE << MRS_OPCODE_OFFSET) | (rd << 8) | (spec_reg);
+    add_armv6m_inst(op, code_func);
+}
+void push(int r, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (PUSH_OPCODE << PUSH_OPCODE_OFFSET) | (1 << r);
     add_armv6m_inst(op, code_func);
 }
 
@@ -332,8 +343,11 @@ void rx_to_result(SymbolTable *symbols, IRValue *result, int r, MachineCodeFunct
     }
 }
 
+int next_condition = C_ALWAYS;
 void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *code_func) {
     switch (ir_op->opcode) {
+
+        // Data operations
         case ir_add: {
             int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
             int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
@@ -376,16 +390,30 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
             rx_to_result(symbols, &ir_op->result, rd, code_func);
             break;
         }
+
+        // Comparison
         case ir_equals: {
             int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
             int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
             int rd = result_rx(&ir_op->result);
             cmp(rn, rm, code_func);
-            mrs(rd, 0, code_func);
-            // TODO mov? (and how will this work with branches?)
+            // mrs(rd, 0, code_func);
+            next_condition = C_EQUALS;
             rx_to_result(symbols, &ir_op->result, rd, code_func);
             break;
         }
+        case ir_less_than: {
+            int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
+            int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
+            int rd = result_rx(&ir_op->result);
+            cmp(rn, rm, code_func);
+            // mrs(rd, 0, code_func);
+            next_condition = C_LESSTHAN;
+            rx_to_result(symbols, &ir_op->result, rd, code_func);
+            break;
+        }
+
+        // Copy
         case ir_copy: {
             if (ir_op->result.type == irv_temp) {
                 int rd = result_rx(&ir_op->result);
@@ -394,6 +422,13 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
                 int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
                 rx_to_result(symbols, &ir_op->result, rn, code_func);
             }
+            break;
+        }
+
+        // Functions
+        case ir_param: {
+            int r = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
+            push(r, code_func);
             break;
         }
     }
@@ -575,6 +610,18 @@ void print_op_machine_code(ARMv6Op *op) {
             (op->code & 0b0000000000000111) >> 0,
             (op->code & 0b0000000000111000) >> 3
         );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> PUSH_OPCODE_OFFSET) == PUSH_OPCODE) {
+        int registers = op->code & 0b11111111;
+        // we only support one register at a time
+        int r = -1;
+        for (int i = 0; i < 8; i++) {
+            if ((registers >> i) == 1) {
+                r = i;
+                break;
+            }
+        }
+        printf("PUSH R%d              ", r);
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else {
         PANIC("UNIDENTIFIED ARMv6-M OPCODE: %x\n", op->code);
