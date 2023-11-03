@@ -60,7 +60,6 @@
 
 void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op);
 
-// TODO R8 used somewhere
 void add_armv6m_inst(ARMv6Op op, MachineCodeFunction *code_func) {
     code_func->ops[code_func->len] = op;
     code_func->len++;
@@ -462,6 +461,11 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
                 mov_r(r, 0, code_func);
             }
             rx_to_result(symbols, &ir_op->result, r, code_func);
+            break;
+        }
+        case ir_return: {
+            int r = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
+            mov_r(0, r, code_func);
             break;
         }
     }
