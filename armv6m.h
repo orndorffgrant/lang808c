@@ -8,6 +8,7 @@
 typedef struct _ARMv6Op {
     int label;
     int target_label;
+    int target_function;
     uint16_t code;
 } ARMv6Op;
 

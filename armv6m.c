@@ -51,9 +51,16 @@
 #define MRS_OPCODE_OFFSET 12
 #define PUSH_OPCODE 0b1011010
 #define PUSH_OPCODE_OFFSET 9
+#define POP_OPCODE 0b1011110
+#define POP_OPCODE_OFFSET 9
+#define BL_INIT_OPCODE 0b11110
+#define BL_INIT_OPCODE_OFFSET 11
+#define BL_FIN_OPCODE 0b11010
+#define BL_FIN_OPCODE_OFFSET 11
 
-void print_op_machine_code(ARMv6Op *op);
+void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op);
 
+// TODO R8 used somewhere
 void add_armv6m_inst(ARMv6Op op, MachineCodeFunction *code_func) {
     code_func->ops[code_func->len] = op;
     code_func->len++;
@@ -151,6 +158,19 @@ void mrs(int rd, int spec_reg, MachineCodeFunction *code_func) {
 void push(int r, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (PUSH_OPCODE << PUSH_OPCODE_OFFSET) | (1 << r);
+    add_armv6m_inst(op, code_func);
+}
+void pop(int r, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (POP_OPCODE << POP_OPCODE_OFFSET) | (1 << r);
+    add_armv6m_inst(op, code_func);
+}
+void bl(int target_function, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.target_function = target_function;
+    op.code = (BL_INIT_OPCODE << BL_INIT_OPCODE_OFFSET);
+    add_armv6m_inst(op, code_func);
+    op.code = (BL_FIN_OPCODE << BL_FIN_OPCODE_OFFSET);
     add_armv6m_inst(op, code_func);
 }
 
@@ -431,6 +451,19 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
             push(r, code_func);
             break;
         }
+        case ir_call: {
+            Function *func = &symbols->functions[ir_op->arg1.func_index];
+            int r = result_rx(&ir_op->result);
+            bl(ir_op->arg1.func_index, code_func);
+            for (int i = 0; i < func->func_args_len; i++) {
+                pop(R_ARG2_DEST, code_func);
+            }
+            if (r != 0) {
+                mov_r(r, 0, code_func);
+            }
+            rx_to_result(symbols, &ir_op->result, r, code_func);
+            break;
+        }
     }
 }
 
@@ -466,7 +499,7 @@ void print_uint16_t_binary(uint16_t i) {
     printf("%d", i & 0x1);
 }
 uint16_t op_init = 0;
-void print_op_machine_code(ARMv6Op *op) {
+void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op) {
     if (op->label != 0) {
         printf("%2d: ", op->label);
     } else {
@@ -483,6 +516,22 @@ void print_op_machine_code(ARMv6Op *op) {
         );
         printf("\t(");
         print_uint16_t_binary(MRS_INIT);
+        printf("  ");
+        print_uint16_t_binary(op->code);
+        printf(")\n");
+        op_init = 0;
+    } else if ((op->code >> BL_INIT_OPCODE_OFFSET) == BL_INIT_OPCODE) {
+        op_init = op->code;
+        printf("\r");
+    } else if (
+        ((op_init >> BL_INIT_OPCODE_OFFSET) == BL_INIT_OPCODE)
+        && ((op->code >> BL_FIN_OPCODE_OFFSET) == BL_FIN_OPCODE)
+    ) {
+        Function *func = &symbols->functions[op->target_function];
+        STRINGREF_TO_CSTR1(&func->name, 512);
+        printf("BL %s              ", cstr1);
+        printf("\t(");
+        print_uint16_t_binary(op_init);
         printf("  ");
         print_uint16_t_binary(op->code);
         printf(")\n");
@@ -623,6 +672,18 @@ void print_op_machine_code(ARMv6Op *op) {
         }
         printf("PUSH R%d              ", r);
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> POP_OPCODE_OFFSET) == POP_OPCODE) {
+        int registers = op->code & 0b11111111;
+        // we only support one register at a time
+        int r = -1;
+        for (int i = 0; i < 8; i++) {
+            if ((registers >> i) == 1) {
+                r = i;
+                break;
+            }
+        }
+        printf("POP R%d               ", r);
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else {
         PANIC("UNIDENTIFIED ARMv6-M OPCODE: %x\n", op->code);
     }
@@ -632,7 +693,7 @@ void print_function_machine_code(SymbolTable *symbols, MachineCodeFunction *code
     STRINGREF_TO_CSTR1(&func->name, 512);
     printf("function %s ARMv6-M\n", cstr1);
     for (int i = 0; i < code_func->len; i++) {
-        print_op_machine_code(&code_func->ops[i]);
+        print_op_machine_code(symbols, &code_func->ops[i]);
     }
     printf("\n");
 }
