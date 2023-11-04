@@ -217,7 +217,7 @@ MemoryMappedPeripheral RTCMode0 @0x40001400 !3 {
 # This sets the dir bit of pin 30 so that we can use it as output
 # Pin 30 is connected to the on-board LED
 initialize PortB {
-    dir = 0x20000000; # 1 << 30
+    dir = 0x40000000; # 1 << 30
 }
 
 # Here we define the initial values of the GCLK registers

@@ -459,7 +459,7 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
             int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
             int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
             int rd = result_rx(&ir_op->result);
-            cmp(rn, rm, code_func);
+            cmp(rm, rn, code_func);
             // mrs(rd, 0, code_func);
             next_condition = C_LESSTHAN;
             rx_to_result(symbols, &ir_op->result, rd, code_func);
