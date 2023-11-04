@@ -6,6 +6,7 @@
 #include "symbols.h"
 
 typedef struct _ARMv6Op {
+    int address;
     int label;
     int target_label;
     int target_function;
