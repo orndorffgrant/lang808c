@@ -300,14 +300,14 @@ int arg_to_rX(SymbolTable *symbols, IRValue *arg, int r, MachineCodeFunction *co
             Function *func = &symbols->functions[arg->func_index];
             FunctionArg *func_arg = &symbols->func_args[arg->func_arg_index];
             int func_arg_num = arg->func_arg_index - func->func_args_index;
-            int sp_offset = func_arg_num * 4;
+            int sp_offset = (func_arg_num + 1) * 4;
             mov_r(R_ARG2_DEST, R_SP, code_func);
             if (func_arg->int_type == int_u8) {
                 ldrb(r, R_ARG2_DEST, sp_offset, code_func);
             } else if (func_arg->int_type == int_u16) {
-                ldrh(r, R_ARG2_DEST, sp_offset, code_func);
+                ldrh(r, R_ARG2_DEST, sp_offset >> 1, code_func);
             } else if (func_arg->int_type == int_u32) {
-                ldr(r, R_ARG2_DEST, sp_offset, code_func);
+                ldr(r, R_ARG2_DEST, sp_offset >> 2, code_func);
             } else {
                 PANIC("INVALID INT TYPE OF STATIC VARIABLE\n");
             }
@@ -729,7 +729,7 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
             "STR R%d, [R%d + #0x%x]  ",
             (op->code & 0b0000000000000111) >> 0,
             (op->code & 0b0000000000111000) >> 3,
-            (op->code & 0b0000011111000000) >> 6
+            ((op->code & 0b0000011111000000) >> 6) << 2
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> STRH_OPCODE_OFFSET) == STRH_OPCODE) {
@@ -737,7 +737,7 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
             "STRH R%d, [R%d + #0x%x] ",
             (op->code & 0b0000000000000111) >> 0,
             (op->code & 0b0000000000111000) >> 3,
-            (op->code & 0b0000011111000000) >> 6
+            ((op->code & 0b0000011111000000) >> 6) << 1
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> STRB_OPCODE_OFFSET) == STRB_OPCODE) {
@@ -753,7 +753,7 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
             "LDR R%d, [R%d + #0x%x]  ",
             (op->code & 0b0000000000000111) >> 0,
             (op->code & 0b0000000000111000) >> 3,
-            (op->code & 0b0000011111000000) >> 6
+            ((op->code & 0b0000011111000000) >> 6) << 2
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> LDRH_OPCODE_OFFSET) == LDRH_OPCODE) {
@@ -761,7 +761,7 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
             "LDRH R%d, [R%d + #0x%x] ",
             (op->code & 0b0000000000000111) >> 0,
             (op->code & 0b0000000000111000) >> 3,
-            (op->code & 0b0000011111000000) >> 6
+            ((op->code & 0b0000011111000000) >> 6) << 1
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> LDRB_OPCODE_OFFSET) == LDRB_OPCODE) {
