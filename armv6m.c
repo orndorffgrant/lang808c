@@ -159,9 +159,19 @@ void push(int r, MachineCodeFunction *code_func) {
     op.code = (PUSH_OPCODE << PUSH_OPCODE_OFFSET) | (1 << r);
     add_armv6m_inst(op, code_func);
 }
+void push_lr(MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (PUSH_OPCODE << PUSH_OPCODE_OFFSET) | (1 << 8);
+    add_armv6m_inst(op, code_func);
+}
 void pop(int r, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (POP_OPCODE << POP_OPCODE_OFFSET) | (1 << r);
+    add_armv6m_inst(op, code_func);
+}
+void pop_pc(MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (POP_OPCODE << POP_OPCODE_OFFSET) | (1 << 8);
     add_armv6m_inst(op, code_func);
 }
 void bl(int target_function, MachineCodeFunction *code_func) {
@@ -466,6 +476,7 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
         case ir_return: {
             int r = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
             mov_r(0, r, code_func);
+            pop_pc(code_func);
             break;
         }
     }
@@ -473,6 +484,7 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
 
 void ir_to_armv6m_function(SymbolTable *symbols, MachineCodeFunction *code_func, int func_index) {
     Function *func = &symbols->functions[func_index];
+    push_lr(code_func);
     for (int i = 0; i < func->ir_code_len; i++) {
         ir_to_armv6m_inst(symbols, &symbols->ir_code[func->ir_code_index + i], code_func);
     }
@@ -665,28 +677,36 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op) {
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> PUSH_OPCODE_OFFSET) == PUSH_OPCODE) {
-        int registers = op->code & 0b11111111;
+        int registers = op->code & 0b111111111;
         // we only support one register at a time
         int r = -1;
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 9; i++) {
             if ((registers >> i) == 1) {
                 r = i;
                 break;
             }
         }
-        printf("PUSH R%d              ", r);
+        if (r == 8) {
+            printf("PUSH LR              ");
+        } else {
+            printf("PUSH R%d              ", r);
+        }
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> POP_OPCODE_OFFSET) == POP_OPCODE) {
-        int registers = op->code & 0b11111111;
+        int registers = op->code & 0b111111111;
         // we only support one register at a time
         int r = -1;
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 9; i++) {
             if ((registers >> i) == 1) {
                 r = i;
                 break;
             }
         }
-        printf("POP R%d               ", r);
+        if (r == 8) {
+            printf("POP PC               ");
+        } else {
+            printf("POP R%d               ", r);
+        }
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else {
         PANIC("UNIDENTIFIED ARMv6-M OPCODE: %x\n", op->code);
