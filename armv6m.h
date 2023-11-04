@@ -24,5 +24,6 @@ typedef struct _MachineCode {
 
 void ir_to_armv6m(SymbolTable *symbols, MachineCode *code);
 void print_all_machine_code(SymbolTable *symbols, MachineCode *code);
+void write_function_object_code(SymbolTable *symbols, MachineCode *code);
 
 #endif

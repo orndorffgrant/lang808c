@@ -3,6 +3,7 @@
 #include "ir.h"
 #include "symbols.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define R_ARG1 0
@@ -59,6 +60,8 @@
 #define BL_FIN_OPCODE_OFFSET 11
 #define B_OPCODE 0b1101
 #define B_OPCODE_OFFSET 12
+#define B_ALWAYS_OPCODE 0b11100
+#define B_ALWAYS_OPCODE_OFFSET 11
 
 void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i);
 
@@ -193,7 +196,11 @@ void bl(int target_function, MachineCodeFunction *code_func) {
 void b(int cond, int target_label, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.target_label = target_label;
-    op.code = (B_OPCODE << B_OPCODE_OFFSET) | (cond << 8);
+    if (cond == C_ALWAYS) {
+        op.code = (B_ALWAYS_OPCODE << B_ALWAYS_OPCODE_OFFSET);
+    } else {
+        op.code = (B_OPCODE << B_OPCODE_OFFSET) | (cond << 8);
+    }
     add_armv6m_inst(op, code_func);
 }
 
@@ -525,8 +532,18 @@ void fill_local_branches(MachineCodeFunction *code_func) {
             ARMv6Op *branch = &code_func->ops[i];
             for (int j = 0; j < code_func->len; j++) {
                 if (code_func->ops[j].label == branch->target_label) {
-                    int8_t offset = j - i; // technically *2, but lose last bit so /2
-                    branch->code |= (uint8_t)offset;
+                    if ((branch->code >> B_OPCODE_OFFSET) == B_OPCODE) {
+                        // technically *2, but lose last bit so /2
+                        // Also PC is already +4 beyond current instruction, so -2
+                        int8_t offset = (j - i) - 2;
+                        branch->code |= (uint8_t)offset;
+                    } else { // B_ALWAYS
+                        // technically *2, but lose last bit so /2
+                        // Also PC is already +4 beyond current instruction, so -2
+                        int16_t offset = (j - i) - 2;
+                        branch->code |= (((uint16_t)offset) & 0b0000011111111111);
+
+                    }
                 }
             }
         }
@@ -622,14 +639,21 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
         if (offset & 0b100000000) {
             offset |= 0b1111111000000000;
         }
-        int16_t offset_s = offset;
-        if (cond == C_ALWAYS) {
-            printf("B %d                 ", offset_s);
-        } else if (cond == C_EQUALS) {
+        int16_t offset_s = offset + 4;
+        if (cond == C_EQUALS) {
             printf("BEQ %d               ", offset_s);
         } else if (cond == C_LESSTHAN) {
             printf("BLT %d               ", offset_s);
         }
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> B_ALWAYS_OPCODE_OFFSET) == B_ALWAYS_OPCODE) {
+        uint16_t offset = op->code & 0b11111111111;
+        offset = offset << 1;
+        if (offset & 0b100000000000) {
+            offset |= 0b1111000000000000;
+        }
+        int16_t offset_s = offset + 4;
+        printf("B %d                 ", offset_s);
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> ADDS_OPCODE_OFFSET) == ADDS_OPCODE) {
         printf(
@@ -803,5 +827,20 @@ void print_function_machine_code(SymbolTable *symbols, MachineCodeFunction *code
 void print_all_machine_code(SymbolTable *symbols, MachineCode *code) {
     for (int i = 0; i < symbols->functions_num; i++) {
         print_function_machine_code(symbols, &code->functions[i], i);
+    }
+}
+
+void write_function_object_code(SymbolTable *symbols, MachineCode *code) {
+    for (int i = 0; i < symbols->functions_num; i++) {
+        Function *func = &symbols->functions[i];
+        MachineCodeFunction *code_func = &code->functions[i];
+        STRINGREF_TO_CSTR1(&func->name, 512);
+        char file_name[544] = {0};
+        sprintf(file_name, "out-%s.o", cstr1);
+        FILE *object_file = fopen(file_name, "w");
+        for (int j = 0; j < code_func->len; j++) {
+            fwrite(&code_func->ops[j].code, 2, 1, object_file);
+        }
+        fclose(object_file);
     }
 }
