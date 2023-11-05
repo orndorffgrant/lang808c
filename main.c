@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     // symbol table as well
     parse(tokens, token_num, &symbols);
 
-    // print_all_ir(&symbols);
+    print_all_ir(&symbols);
 
     // Initialize the MachineCode struct
     // "MachineCode" is defined in "armv6m.h"
