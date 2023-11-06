@@ -984,6 +984,9 @@ int on_interrupt(Token *tokens, int next_token, SymbolTable *symbols, int indent
 
     int func_index = add_function(symbols, func);
 
+    handler.func_index = func_index;
+    add_interrupt_handler(symbols, handler);
+
     next_token = match(t_leftbrace, tokens, next_token, indent);
     while (tokens[next_token].type != t_rightbrace) {
         // any number of function statements

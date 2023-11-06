@@ -146,6 +146,7 @@ int add_struct_item(SymbolTable *symbols, StructItem item);
 int add_bitfield_item(SymbolTable *symbols, BitFieldItem item);
 int add_bitenum_item(SymbolTable *symbols, BitEnumItem item);
 int add_function(SymbolTable *symbols, Function item);
+int add_interrupt_handler(SymbolTable *symbols, InterruptHandler item);
 int add_function_arg(SymbolTable *symbols, FunctionArg item);
 int add_static_variable(SymbolTable *symbols, Variable item);
 int add_function_variable(SymbolTable *symbols, Variable item);

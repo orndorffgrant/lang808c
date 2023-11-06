@@ -26,6 +26,10 @@ int add_function(SymbolTable *symbols, Function item) {
   symbols->functions[symbols->functions_num] = item;
   return symbols->functions_num++;
 }
+int add_interrupt_handler(SymbolTable *symbols, InterruptHandler item) {
+  symbols->interrupt_handlers[symbols->interrupt_handlers_num] = item;
+  return symbols->interrupt_handlers_num++;
+}
 int add_function_arg(SymbolTable *symbols, FunctionArg item) {
   symbols->func_args[symbols->func_args_num] = item;
   return symbols->func_args_num++;

@@ -1,5 +1,2 @@
 R8 used somewhere? (might degrade to r0 but work out?)
 ensure we don't need to push/pop other registers
-
-____init needs final instructions to turn on interrupts and then loop forever/yield/other?
-clear interrupts on interrupt handler end

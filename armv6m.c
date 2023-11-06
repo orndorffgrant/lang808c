@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define NVIC_ISER 0xe000e100
+#define NVIC_ICPR 0xe000e280
+
 #define R_ARG1 0
 #define R_ARG2_DEST 1 // could probably combine arg2 and dest registers
 #define R_TEMP_OFFSET 2
@@ -33,6 +36,8 @@
 #define LSLS_R_OPCODE_OFFSET 6
 #define ANDS_OPCODE 0b0100000000
 #define ANDS_OPCODE_OFFSET 6
+#define ORRS_OPCODE 0b0100001100
+#define ORRS_OPCODE_OFFSET 6
 #define STR_OPCODE 0b01100
 #define STR_OPCODE_OFFSET 11
 #define STRH_OPCODE 0b10000
@@ -122,6 +127,11 @@ void ands(int rd, int rm, MachineCodeFunction *code_func) {
     op.code = (ANDS_OPCODE << ANDS_OPCODE_OFFSET) | (rm << 3) | (rd);
     add_armv6m_inst(op, code_func);
 }
+void orrs(int rd, int rm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (ORRS_OPCODE << ORRS_OPCODE_OFFSET) | (rm << 3) | (rd);
+    add_armv6m_inst(op, code_func);
+}
 void str(int rt, int rn, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (STR_OPCODE << STR_OPCODE_OFFSET) | (imm << 6) | (rn << 3) | (rt);
@@ -204,7 +214,7 @@ void b(int cond, int target_label, MachineCodeFunction *code_func) {
     add_armv6m_inst(op, code_func);
 }
 
-void immediate_to_rX(int imm, int r, MachineCodeFunction *code_func) {
+void immediate_to_rX(uint32_t imm, int r, MachineCodeFunction *code_func) {
     if (imm <= 0xFF) {
         mov(r, imm, code_func);
     } else if (imm <= 0xFFFF) {
@@ -394,7 +404,7 @@ void rx_to_result(SymbolTable *symbols, IRValue *result, int r, MachineCodeFunct
 }
 
 int next_condition = C_ALWAYS;
-void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *code_func) {
+void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *code_func, int func_index) {
     if (ir_op->label) {
         next_label = ir_op->label;
     }
@@ -509,6 +519,20 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
             break;
         }
         case ir_return: {
+            // find interrupt handler if it exists
+            for (int i = 0; i < symbols->interrupt_handlers_num; i++) {
+                InterruptHandler *handler = &symbols->interrupt_handlers[i];
+                if (handler->func_index == func_index) {
+                    // This function is a handler, clear the interrupt flag
+                    immediate_to_rX(NVIC_ICPR, R_ARG1, code_func);
+                    ldr(R_ARG2_DEST, R_ARG1, 0, code_func);
+                    mov(2, 1, code_func);
+                    lsls(2, 2, handler->interrupt_number, code_func);
+                    orrs(R_ARG2_DEST, 2, code_func);
+                    str(R_ARG2_DEST, R_ARG1, 0, code_func);
+                }
+            }
+            // normal return
             int r = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
             mov_r(0, r, code_func);
             pop_pc(code_func);
@@ -522,7 +546,7 @@ void ir_to_armv6m_function(SymbolTable *symbols, MachineCodeFunction *code_func,
     Function *func = &symbols->functions[func_index];
     push_lr(code_func);
     for (int i = 0; i < func->ir_code_len; i++) {
-        ir_to_armv6m_inst(symbols, &symbols->ir_code[func->ir_code_index + i], code_func);
+        ir_to_armv6m_inst(symbols, &symbols->ir_code[func->ir_code_index + i], code_func, func_index);
     }
 }
 
@@ -542,7 +566,6 @@ void fill_local_branches(MachineCodeFunction *code_func) {
                         // Also PC is already +4 beyond current instruction, so -2
                         int16_t offset = (j - i) - 2;
                         branch->code |= (((uint16_t)offset) & 0b0000011111111111);
-
                     }
                 }
             }
@@ -551,9 +574,29 @@ void fill_local_branches(MachineCodeFunction *code_func) {
 }
 
 void ir_to_armv6m(SymbolTable *symbols, MachineCode *code) {
-    printf("Generating ARMv6-M machine code\n");
     for (int i = 0; i < symbols->functions_num; i++) {
         ir_to_armv6m_function(symbols, &code->functions[i], i);
+    }
+
+    // Enable interrupts at end of ____init if we have any
+    MachineCodeFunction *init_code = &code->functions[0];
+    if (symbols->interrupt_handlers_num > 0) {
+        immediate_to_rX(NVIC_ISER, R_ARG1, init_code);
+        ldr(R_ARG2_DEST, R_ARG1, 0, init_code);
+        for (int i = 0; i < symbols->interrupt_handlers_num; i++) {
+            InterruptHandler *int_handler = &symbols->interrupt_handlers[i];
+            mov(2, 1, init_code);
+            lsls(2, 2, int_handler->interrupt_number, init_code);
+            orrs(R_ARG2_DEST, 2, init_code);
+        }
+        str(R_ARG2_DEST, R_ARG1, 0, init_code);
+    }
+    // loop forever
+    next_label = 99999;
+    b(C_ALWAYS, 99999, init_code);
+
+    // fill in branches
+    for (int i = 0; i < symbols->functions_num; i++) {
         fill_local_branches(&code->functions[i]);
     }
 }
@@ -720,6 +763,13 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
     } else if ((op->code >> ANDS_OPCODE_OFFSET) == ANDS_OPCODE) {
         printf(
             "ANDS R%d, R%d          ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> ORRS_OPCODE_OFFSET) == ORRS_OPCODE) {
+        printf(
+            "ORRS R%d, R%d          ",
             (op->code & 0b0000000000000111) >> 0,
             (op->code & 0b0000000000111000) >> 3
         );
