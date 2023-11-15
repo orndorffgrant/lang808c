@@ -622,6 +622,7 @@ void print_uint16_t_binary(uint16_t i) {
 
 bool double_op = false;
 uint16_t op_init = 0;
+ARMv6Op op_init_op = {0};
 void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
     if (!double_op) {
         if (op->target_label) {
@@ -645,6 +646,7 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
     }
     if (op->code == MRS_INIT) {
         op_init = MRS_INIT;
+        op_init_op = *op;
         double_op = true;
     } else if ((op_init == MRS_INIT) && ((op->code >> MRS_OPCODE_OFFSET) == MRS_OPCODE)) {
         printf(
@@ -660,12 +662,13 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
         op_init = 0;
     } else if ((op->code >> BL_INIT_OPCODE_OFFSET) == BL_INIT_OPCODE) {
         op_init = op->code;
+        op_init_op = *op;
         double_op = true;
     } else if (
         ((op_init >> BL_INIT_OPCODE_OFFSET) == BL_INIT_OPCODE)
         && ((op->code >> BL_FIN_OPCODE_OFFSET) == BL_FIN_OPCODE)
     ) {
-        Function *func = &symbols->functions[op->target_function];
+        Function *func = &symbols->functions[op_init_op.target_function];
         STRINGREF_TO_CSTR1(&func->name, 512);
         printf("BL %s              ", cstr1);
         printf("\t(");
