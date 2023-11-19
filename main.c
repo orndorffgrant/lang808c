@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     char *source_file_name = argv[1];
-    printf("Compiling %s\n", source_file_name);
+    //printf("Compiling %s\n", source_file_name);
 
     // Create a buffer to read the source file into
     char source[MAX_SOURCE_LEN];
@@ -81,8 +81,14 @@ int main(int argc, char *argv[]) {
     // jump/branch instructions will not be complete.
     ir_to_armv6m(&symbols, &code);
 
-    print_all_machine_code(&symbols, &code);
-    write_function_object_code(&symbols, &code);
+    // print_all_machine_code(&symbols, &code);
+    // write_function_object_code(&symbols, &code);
+
+    uint8_t linked_blob[65536];
+    link(&symbols, &code, linked_blob);
+    hex(linked_blob);
+
+
     
     return 0;
 }
