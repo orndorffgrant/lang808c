@@ -218,6 +218,7 @@ MemoryMappedPeripheral RTCMode0 @0x40001400 !3 {
 # Pin 30 is connected to the on-board LED
 initialize PortB {
     dir = 0x40000000; # 1 << 30
+    outtgl = 0x40000000; # 1 << 30
 }
 
 # Here we define the initial values of the GCLK registers
@@ -264,7 +265,7 @@ initialize RTCMode0 {
 # This defines a static variable, which is a global variable at a static location in memory
 # Here, the variable is called "counting_up" and initialized to 1.
 static u32 counting_up = 1;
-static u32 blink_times = 1;
+static u32 blink_times = 2;
 
 # This function just loops for a while to take up some time
 # The number of times it loops is passed via a function argument
@@ -283,7 +284,7 @@ fun delay(delay_count: u32) {
 # and then off.
 fun blinkLED() {
     PortB.outtgl = 1 << 30;
-    delay(1000);
+    delay(5000);
     PortB.outtgl = 1 << 30;
 }
 
@@ -295,7 +296,7 @@ fun blink_and_update_blink_times(blink_times: u32): u32 {
     u32 i = 0;
     while (i < blink_times) {
         blinkLED();
-        delay(1000);
+        delay(5000);
         i = i + 1;
     }
 
@@ -319,7 +320,8 @@ on_interrupt RTCMode0 {
 
     if (PortB.in & 1 << 30 == 0) {
         # if button is not pressed, reset state
-        blink_times = 1;
+        #blink_times = 1;
+        blink_times = blink_and_update_blink_times(blink_times);
     } else {
         # if button is pressed, blink the LED and update
         # how many times we should update the LED for next interrupt
