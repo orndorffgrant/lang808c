@@ -8,6 +8,6 @@
 #include "symbols.h"
 
 int link(SymbolTable *symbols, MachineCode *code, uint8_t *dest);
-void hex(uint8_t *code, int len);
+void print_hex(uint8_t *code, int len);
 
 #endif

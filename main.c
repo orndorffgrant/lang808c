@@ -7,6 +7,7 @@
 #include "ir.h"
 #include "symbols.h"
 #include "lexer.h"
+#include "linker.h"
 #include "parser.h"
 
 #define MAX_SOURCE_LEN 65536
@@ -85,10 +86,8 @@ int main(int argc, char *argv[]) {
     // write_function_object_code(&symbols, &code);
 
     uint8_t linked_blob[65536];
-    link(&symbols, &code, linked_blob);
-    hex(linked_blob);
-
-
+    int linked_blob_len = link(&symbols, &code, linked_blob);
+    print_hex(linked_blob, linked_blob_len);
     
     return 0;
 }

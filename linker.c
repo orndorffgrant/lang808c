@@ -73,8 +73,6 @@ int link(SymbolTable *symbols, MachineCode *code, uint8_t *dest) {
     curr_offset += 4;
     // end core arm vector table
     // begin samd21-specific vector table
-    add32(dest, curr_offset, reset_fn); // systick
-    curr_offset += 4;
     add32(dest, curr_offset, reset_fn); // power_manager_handler
     curr_offset += 4;
     add32(dest, curr_offset, reset_fn); // system_control_handler
@@ -141,7 +139,7 @@ int link(SymbolTable *symbols, MachineCode *code, uint8_t *dest) {
                 // curr_offset is the address of the function
                 // calculate position of vector table entry
                 int position = (16 * 4) + (symbols->interrupt_handlers[k].interrupt_number * 4);
-                add32(dest, position + 1, curr_offset); // add one for some reason
+                add32(dest, position, curr_offset + 1); // add one for some reason
             }
         }
         for (int j = 0; j < code->functions[i].len; j++) {
@@ -152,9 +150,47 @@ int link(SymbolTable *symbols, MachineCode *code, uint8_t *dest) {
 
     return curr_offset;
 }
-void hex(uint8_t *code, int len) {
-    for (int i = 0; i < 0x10; i++) {
-        for (int j = 0; i < 0x10; i++) {
-        printf("%h", code);
+void print_hex(uint8_t *code, int len) {
+    int num_full_rows = len / 0x10;
+    int len_last_row = len % 0x10;
+    // all full rows
+    for (int i = 0; i < (num_full_rows + 1); i++) {
+        int8_t sum = 0;
+        printf(":"); // start char
+
+        printf("10"); // byte count
+        sum += 0x10;
+
+        int curr_address = i * 0x10;
+        printf("%04x", curr_address); // address
+        sum += (curr_address >> 8);
+        sum += (curr_address & 0xff);
+
+        printf("00"); // record type 00 is data
+        sum += 0;
+
+        if (i < num_full_rows) {
+            for (int j = 0; j < 0x10; j++) {
+                printf("%02x", code[(i * 0x10) + j]);
+                sum += code[(i * 0x10) + j];
+            }
+        } else {
+            // the last non-full row, pad with zeroes
+            int j;
+            for (j = 0; j < len_last_row; j++) {
+                printf("%02x", code[(i * 0x10) + j]);
+                sum += code[(i * 0x10) + j];
+            }
+            for (; j < 0x10; j++) {
+                printf("%02x", 0);
+                sum += 0;
+            }
+        }
+        printf("%02x", (uint8_t)-sum); // checksum
+        printf("\n");
     }
+    // start linear address - hardcoded to reset vector
+    printf(":04000005000000B146\n");
+    // end of file
+    printf(":00000001FF\n");
 }
