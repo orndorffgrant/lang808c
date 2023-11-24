@@ -27,9 +27,7 @@ int link(SymbolTable *symbols, MachineCode *code, uint8_t *dest) {
             if (op->target_function) {
                 int curr_address = op->address;
                 int target_address = code->functions[op->target_function].ops[0].address;
-                int offset = (target_address - curr_address) - 4; // TODO double check -4
-                //printf("offset: %d\n", offset);
-                //printf("offset: %x\n", offset);
+                int offset = (target_address - curr_address) - 4;
                 int s = 0;
                 int j1 = 0;
                 int j2 = 0;
@@ -38,12 +36,8 @@ int link(SymbolTable *symbols, MachineCode *code, uint8_t *dest) {
                     j1 = 1;
                     j2 = 1;
                 }
-                //printf("s: %d, j1: %d, j2: %d\n", s, j1, j2);
-                //printf("one: %x\n", ((uint32_t)offset) & 0b1111111111000000000000);
                 uint16_t imm10 = (((uint32_t)offset) & 0b1111111111000000000000) >> 12;
-                //printf("imm10: %x\n", imm10);
                 uint16_t imm11 = (((uint32_t)offset) & 0b111111111110) >> 1;
-                //printf("imm11: %x\n", imm11);
                 op->code |= (s << 10) | imm10;
                 ARMv6Op *next_op = &code->functions[i].ops[j+1];
                 next_op->code |= (j1 << 13) | (j2 << 11) | (imm11);
