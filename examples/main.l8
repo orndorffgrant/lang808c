@@ -1,5 +1,36 @@
 # This is a REAL Lang808 program designed to run on the SAMD21 Xplained Pro Discovery Kit
 
+# Here we define the PortA peripheral
+# You can find the register definitions in the datasheet for the SAMD21
+MemoryMappedPeripheral PortA @0x41004400 {
+    dir: u32;
+    dirclr: u32;
+    dirset: u32;
+    dirtgl: u32;
+    out: u32;
+    outclr: u32;
+    outset: u32;
+    outtgl: u32;
+    in: u32;
+    ctrl: BitField32 {
+        sampling: 32;
+    };
+    wrconfig: BitField32 {
+        pinmask: 16;
+        pmuxen: 1;
+        inen: 1;
+        pullen: 1;
+        $unused: 3;
+        drvstr: 1;
+        $unused: 1;
+        pmux: 4;
+        wrpmux: 1;
+        $unused: 1;
+        wrpincfg: 1;
+        hwsel: 1;
+    };
+}
+
 # Here we define the PortB peripheral
 # You can find the register definitions in the datasheet for the SAMD21
 MemoryMappedPeripheral PortB @0x41004480 {
@@ -214,6 +245,21 @@ MemoryMappedPeripheral RTCMode0 @0x40001400 !3 {
 }
 
 # Here we define the initial values of the PortB registers
+# This sets the dir bit of pin 15 so that we can use it as input
+# Pin 15 is connected to the on-board switch
+initialize PortA {
+    dirclr = 0x00008000; # 1 << 15
+    outset = 0x00008000; # 1 << 15
+    wrconfig = {
+        hwsel = 0;
+        pinmask = 0x8000;
+        wrpincfg = 1;
+        inen = 1;
+        pullen = 1;
+    };
+}
+
+# Here we define the initial values of the PortB registers
 # This sets the dir bit of pin 30 so that we can use it as output
 # Pin 30 is connected to the on-board LED
 initialize PortB {
@@ -318,14 +364,14 @@ fun blink_and_update_blink_times(blink_times: u32): u32 {
 # on_interrupt keyword auto-enables interrupt in NVIC
 on_interrupt RTCMode0 {
 
-    if (PortB.in & 1 << 30 == 0) {
+    if (PortA.in & 1 << 15 == 0x8000) {
         # if button is not pressed, reset state
-        #blink_times = 1;
-        blink_times = blink_and_update_blink_times(blink_times);
+        blink_times = 1;
     } else {
         # if button is pressed, blink the LED and update
         # how many times we should update the LED for next interrupt
-        blink_times = blink_and_update_blink_times(blink_times);
+        #blink_times = blink_and_update_blink_times(blink_times);
+        blinkLED();
     }
 
     # This clears the RTC peripheral interrupt flag

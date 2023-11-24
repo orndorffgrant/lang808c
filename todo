@@ -1,2 +1,3 @@
 R8 used somewhere? (might degrade to r0 but work out?)
-ensure we don't need to push/pop other registers
+
+set sp correctly for local variables (calling other function tramples our local vars)
