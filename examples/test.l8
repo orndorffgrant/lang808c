@@ -261,11 +261,21 @@ initialize RTCMode0 {
     };
 }
 
+fun delay(delay_count: u32) {
+    u32 i = 0;
+    while (i < delay_count) {
+        i = i + 1;
+    }
+}
 fun blinkLED() {
+    PortB.outtgl = 1 << 30;
+    delay(10000);
+    PortB.outtgl = 1 << 30;
+    delay(10000);
     PortB.outtgl = 1 << 30;
 }
 on_interrupt RTCMode0 {
-    PortB.outtgl = 1 << 30;
+    blinkLED();
     RTCMode0.intflag = {
         comp0 = 1;
     };
