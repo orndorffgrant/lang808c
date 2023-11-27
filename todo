@@ -1,3 +1,1 @@
 R8 used somewhere? (might degrade to r0 but work out?)
-
-set sp correctly for local variables (calling other function tramples our local vars)

@@ -22,10 +22,14 @@
 #define ADDS_OPCODE_OFFSET 9
 #define ADDS_IMM_OPCODE 0b00110
 #define ADDS_IMM_OPCODE_OFFSET 11
+#define ADD_SP_IMM_OPCODE 0b101100000
+#define ADD_SP_IMM_OPCODE_OFFSET 7
 #define SUBS_OPCODE 0b0001101
 #define SUBS_OPCODE_OFFSET 9
 #define SUBS_IMM_OPCODE 0b00111
 #define SUBS_IMM_OPCODE_OFFSET 11
+#define SUB_SP_IMM_OPCODE 0b101100001
+#define SUB_SP_IMM_OPCODE_OFFSET 7
 #define MOV_OPCODE 0b00100
 #define MOV_OPCODE_OFFSET 11
 #define MOV_R_OPCODE 0b01000110
@@ -90,6 +94,11 @@ void adds_imm(int rdn, int imm, MachineCodeFunction *code_func) {
     op.code = (ADDS_IMM_OPCODE << ADDS_IMM_OPCODE_OFFSET) | (rdn << 8) | (imm);
     add_armv6m_inst(op, code_func);
 }
+void add_sp_imm(int imm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (ADD_SP_IMM_OPCODE << ADD_SP_IMM_OPCODE_OFFSET) | (imm);
+    add_armv6m_inst(op, code_func);
+}
 void subs(int rd, int rn, int rm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (SUBS_OPCODE << SUBS_OPCODE_OFFSET) | (rm << 6) | (rn << 3) | (rd);
@@ -98,6 +107,11 @@ void subs(int rd, int rn, int rm, MachineCodeFunction *code_func) {
 void subs_imm(int rdn, int imm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (SUBS_IMM_OPCODE << SUBS_IMM_OPCODE_OFFSET) | (rdn << 8) | (imm);
+    add_armv6m_inst(op, code_func);
+}
+void sub_sp_imm(int imm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (SUB_SP_IMM_OPCODE << SUB_SP_IMM_OPCODE_OFFSET) | (imm);
     add_armv6m_inst(op, code_func);
 }
 void mov(int rd, int imm, MachineCodeFunction *code_func) {
@@ -292,15 +306,14 @@ int arg_to_rX(SymbolTable *symbols, IRValue *arg, int r, MachineCodeFunction *co
             Function *func = &symbols->functions[arg->func_index];
             Variable *var = &symbols->function_vars[arg->local_variable_index];
             int local_var_num = arg->local_variable_index - func->func_vars_index;
-            int sp_offset = (local_var_num + 1) * 4;
+            int sp_offset = local_var_num * 4;
             mov_r(R_ARG2_DEST, R_SP, code_func);
-            subs_imm(R_ARG2_DEST, sp_offset, code_func);
             if (var->int_type == int_u8) {
-                ldrb(r, R_ARG2_DEST, 0, code_func);
+                ldrb(r, R_ARG2_DEST, sp_offset, code_func);
             } else if (var->int_type == int_u16) {
-                ldrh(r, R_ARG2_DEST, 0, code_func);
+                ldrh(r, R_ARG2_DEST, sp_offset >> 1, code_func);
             } else if (var->int_type == int_u32) {
-                ldr(r, R_ARG2_DEST, 0, code_func);
+                ldr(r, R_ARG2_DEST, sp_offset >> 2, code_func);
             } else {
                 PANIC("INVALID INT TYPE OF STATIC VARIABLE\n");
             }
@@ -310,7 +323,7 @@ int arg_to_rX(SymbolTable *symbols, IRValue *arg, int r, MachineCodeFunction *co
             Function *func = &symbols->functions[arg->func_index];
             FunctionArg *func_arg = &symbols->func_args[arg->func_arg_index];
             int func_arg_num = arg->func_arg_index - func->func_args_index;
-            int sp_offset = (func_arg_num + 1) * 4;
+            int sp_offset = (func->func_vars_len + 1 + func_arg_num) * 4;
             mov_r(R_ARG2_DEST, R_SP, code_func);
             if (func_arg->int_type == int_u8) {
                 ldrb(r, R_ARG2_DEST, sp_offset, code_func);
@@ -385,15 +398,14 @@ void rx_to_result(SymbolTable *symbols, IRValue *result, int r, MachineCodeFunct
             Function *func = &symbols->functions[result->func_index];
             Variable *var = &symbols->function_vars[result->local_variable_index];
             int local_var_num = result->local_variable_index - func->func_vars_index;
-            int sp_offset = (local_var_num + 1) * 4;
+            int sp_offset = local_var_num * 4;
             mov_r(R_ARG2_DEST, R_SP, code_func);
-            subs_imm(R_ARG2_DEST, sp_offset, code_func);
             if (var->int_type == int_u8) {
-                strb(r, R_ARG2_DEST, 0, code_func);
+                strb(r, R_ARG2_DEST, sp_offset, code_func);
             } else if (var->int_type == int_u16) {
-                strh(r, R_ARG2_DEST, 0, code_func);
+                strh(r, R_ARG2_DEST, sp_offset >> 1, code_func);
             } else if (var->int_type == int_u32) {
-                str(r, R_ARG2_DEST, 0, code_func);
+                str(r, R_ARG2_DEST, sp_offset >> 2, code_func);
             } else {
                 PANIC("INVALID INT TYPE OF STATIC VARIABLE\n");
             }
@@ -405,6 +417,7 @@ void rx_to_result(SymbolTable *symbols, IRValue *result, int r, MachineCodeFunct
 
 int next_condition = C_ALWAYS;
 void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *code_func, int func_index) {
+    Function *func = &symbols->functions[func_index];
     if (ir_op->label) {
         next_label = ir_op->label;
     }
@@ -535,6 +548,7 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
             // normal return
             int r = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
             mov_r(0, r, code_func);
+            add_sp_imm(func->func_vars_len, code_func);
             pop_pc(code_func);
             break;
         }
@@ -545,6 +559,7 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
 void ir_to_armv6m_function(SymbolTable *symbols, MachineCodeFunction *code_func, int func_index) {
     Function *func = &symbols->functions[func_index];
     push_lr(code_func);
+    sub_sp_imm(func->func_vars_len, code_func);
     for (int i = 0; i < func->ir_code_len; i++) {
         ir_to_armv6m_inst(symbols, &symbols->ir_code[func->ir_code_index + i], code_func, func_index);
     }
@@ -716,6 +731,12 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
             (op->code & 0b0000000011111111) >> 0
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> ADD_SP_IMM_OPCODE_OFFSET) == ADD_SP_IMM_OPCODE) {
+        printf(
+            "ADD SP, SP, #0x%x        ",
+            (op->code & 0b0000000001111111) >> 0
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> SUBS_OPCODE_OFFSET) == SUBS_OPCODE) {
         printf(
             "SUBS R%d, R%d, R%d      ",
@@ -729,6 +750,12 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
             "SUBS R%d, #0x%x        ",
             (op->code & 0b0000011100000000) >> 8,
             (op->code & 0b0000000011111111) >> 0
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> SUB_SP_IMM_OPCODE_OFFSET) == SUB_SP_IMM_OPCODE) {
+        printf(
+            "SUB SP, SP, #0x%x        ",
+            (op->code & 0b0000000001111111) >> 0
         );
         printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
     } else if ((op->code >> MOV_OPCODE_OFFSET) == MOV_OPCODE) {

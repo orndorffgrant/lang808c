@@ -311,7 +311,7 @@ initialize RTCMode0 {
 # This defines a static variable, which is a global variable at a static location in memory
 # Here, the variable is called "counting_up" and initialized to 1.
 static u32 counting_up = 1;
-static u32 blink_times = 2;
+static u32 blink_times = 1;
 
 # This function just loops for a while to take up some time
 # The number of times it loops is passed via a function argument
@@ -370,8 +370,7 @@ on_interrupt RTCMode0 {
     } else {
         # if button is pressed, blink the LED and update
         # how many times we should update the LED for next interrupt
-        #blink_times = blink_and_update_blink_times(blink_times);
-        blinkLED();
+        blink_times = blink_and_update_blink_times(blink_times);
     }
 
     # This clears the RTC peripheral interrupt flag
