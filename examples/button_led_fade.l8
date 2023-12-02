@@ -493,10 +493,10 @@ initialize GCLK {
 
 # Here we define the initial values of the RTCMode0 registers
 # This sets it to be in "Count" mode and sets the interrupt to fire when the count
-# reaches 0x80.
-# Since the we set a 32khz clock to drive the RTC, it will reach 0x80 256 times per second.
+# reaches 0x800.
+# Since the we set a 32khz clock to drive the RTC, it will reach 0x800 16 times per second.
 # We set "matchclr" so that the count will go back to zero and continue counting after
-# it reaches 0x80.
+# it reaches 0x800.
 initialize RTCMode0 {
     count = 0x0;
     comp0 = 0x800;
