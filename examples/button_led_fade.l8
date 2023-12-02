@@ -517,13 +517,10 @@ static u32 pressed = 0;
 on_interrupt RTCMode0 {
     u32 led_level = 0;
 
-    if (PortA.in & 0x8000 == 0x8000) {
-        # if button is not pressed, reset state
-        pressed = 0;
-    } else {
+    if (PortA.in & 0x8000 == 0) {
+        # if button is pressed and wasn't before
+        # update the led_level and set pressed
         if (pressed == 0) {
-            # if button is pressed and wasn't before
-            # update the led_level and set pressed
             pressed = 1;
             led_level = TCC0.cc0 >> 6;
             if (led_level == 5) {
@@ -533,6 +530,9 @@ on_interrupt RTCMode0 {
             }
             TCC0.cc0 = led_level << 6;
         }
+    } else {
+        # if button is not pressed, reset state
+        pressed = 0;
     }
 
     # This clears the RTC peripheral interrupt flag
