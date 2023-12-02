@@ -8,9 +8,11 @@ typedef enum _IROpCode {
     ir_add,
     ir_subtract,
     ir_shift_left,
+    ir_shift_right,
     ir_bitwise_and,
     ir_equals,
     ir_less_than,
+    ir_greater_than,
 
     // result = arg1
     ir_copy,

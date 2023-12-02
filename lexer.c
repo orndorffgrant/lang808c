@@ -29,6 +29,7 @@ char *token_type_to_static_string(TokenType token_type) {
         case t_bang: return "bang";
 
         case t_shiftleft: return "shiftleft";
+        case t_shiftright: return "shiftright";
         case t_equalsequals: return "equalsequals";
         case t_lessthan: return "lessthan";
         case t_greaterthan: return "greaterthan";
@@ -227,12 +228,17 @@ TokenType token_type(StringRef str, char *lookahead) {
         return t_bang;
     } else if (str.len == 2 && strncmp(str.str, "<<", str.len) == 0) {
         return t_shiftleft;
+    } else if (str.len == 2 && strncmp(str.str, ">>", str.len) == 0) {
+        return t_shiftright;
     } else if (str.str[0] == '<' && str.len == 1) {
         if (lookahead[0] == '<') {
             return t_NONE;
         }
         return t_lessthan;
     } else if (str.str[0] == '>' && str.len == 1) {
+        if (lookahead[0] == '>') {
+            return t_NONE;
+        }
         return t_greaterthan;
     } else if (str.str[0] == '+' && str.len == 1) {
         return t_plus;

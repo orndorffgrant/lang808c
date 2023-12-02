@@ -231,6 +231,14 @@ void print_irop(SymbolTable *symbols, int irop_index) {
             print_ir_value(symbols, &op->arg2);
             printf("\n");
             break;
+        case ir_shift_right:
+            print_ir_value(symbols, &op->result);
+            printf(" = ");
+            print_ir_value(symbols, &op->arg1);
+            printf(" >> ");
+            print_ir_value(symbols, &op->arg2);
+            printf("\n");
+            break;
         case ir_bitwise_and:
             print_ir_value(symbols, &op->result);
             printf(" = ");
@@ -252,6 +260,14 @@ void print_irop(SymbolTable *symbols, int irop_index) {
             printf(" = ");
             print_ir_value(symbols, &op->arg1);
             printf(" < ");
+            print_ir_value(symbols, &op->arg2);
+            printf("\n");
+            break;
+        case ir_greater_than:
+            print_ir_value(symbols, &op->result);
+            printf(" = ");
+            print_ir_value(symbols, &op->arg1);
+            printf(" > ");
             print_ir_value(symbols, &op->arg2);
             printf("\n");
             break;

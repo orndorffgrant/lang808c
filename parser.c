@@ -220,6 +220,10 @@ int expression_shift(Token *tokens, int next_token, SymbolTable *symbols, int fu
             next_token = match(t_shiftleft, tokens, next_token, indent);
             op.opcode = ir_shift_left;
             break;
+        case t_shiftright:
+            next_token = match(t_shiftright, tokens, next_token, indent);
+            op.opcode = ir_shift_right;
+            break;
         default:
             return next_token;
     }
@@ -306,6 +310,10 @@ int expression(Token *tokens, int next_token, SymbolTable *symbols, int func_ind
         case t_lessthan:
             next_token = match(t_lessthan, tokens, next_token, indent);
             op.opcode = ir_less_than;
+            break;
+        case t_greaterthan:
+            next_token = match(t_greaterthan, tokens, next_token, indent);
+            op.opcode = ir_greater_than;
             break;
         default:
             *final_temp = temp - 1;
@@ -652,7 +660,7 @@ int function_statement_assignment(Token *tokens, int next_token, SymbolTable *sy
 
     next_token = match(t_equals, tokens, next_token, indent);
     if (name_result.result == name_mmp_struct_item) {
-        if (symbols->struct_items[name_result.si_index].type == si_bf) {
+        if (symbols->struct_items[name_result.si_index].type == si_bf && tokens[next_token].type == t_leftbrace) {
             int value = 0;
             next_token = bitfield_value(tokens, next_token, symbols, name_result.si_index, &value, indent);
             op.arg1.type = irv_immediate;

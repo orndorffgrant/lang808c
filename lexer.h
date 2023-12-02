@@ -47,6 +47,7 @@ typedef enum {
 
     // operators
     t_shiftleft,
+    t_shiftright,
     t_equalsequals,
     t_lessthan,
     t_greaterthan,

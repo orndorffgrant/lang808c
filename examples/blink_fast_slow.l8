@@ -218,6 +218,7 @@ MemoryMappedPeripheral RTCMode0 @0x40001400 !3 {
 # Pin 30 is connected to the on-board LED
 initialize PortB {
     dir = 0x40000000; # 1 << 30
+    outtgl = 0x40000000; # 1 << 30
 }
 
 # Here we define the initial values of the GCLK registers
@@ -244,13 +245,13 @@ initialize GCLK {
 
 # Here we define the initial values of the RTCMode0 registers
 # This sets it to be in "Count" mode and sets the interrupt to fire when the count
-# reaches 0x8000.
-# Since the we set a 32khz clock to drive the RTC, it will reach 0x8000 after 1 second.
+# reaches 0x4000.
+# Since the we set a 32khz clock to drive the RTC, it will reach 0x4000 after 0.5 seconds.
 # We set "matchclr" so that the count will go back to zero and continue counting after
-# it reaches 0x8000.
+# it reaches 0x4000.
 initialize RTCMode0 {
     count = 0x0;
-    comp0 = 0x8000;
+    comp0 = 0x4000;
     intenset = {
         comp0 = 1;
     };
@@ -261,22 +262,58 @@ initialize RTCMode0 {
     };
 }
 
+# This defines a static variable, which is a global variable at a static location in memory
+# Here, the variable is called "going_faster" and initialized to 1.
+static u32 going_faster = 1;
+
+# This function just loops for a while to take up some time
+# The number of times it loops is passed via a function argument
 fun delay(delay_count: u32) {
     u32 i = 0;
     while (i < delay_count) {
         i = i + 1;
     }
 }
+
+# This function takes no arguments. It sets the toggle bit of pin 30
+# in PortB, which is the pin connected to the LED.
+# Then it uses the "delay" function to wait for a bit before toggling
+# the LED again.
+# The overall affect is that this function quickly flashes the LED on
+# and then off.
 fun blinkLED() {
     PortB.outtgl = 1 << 30;
-    delay(10000);
-    PortB.outtgl = 1 << 30;
-    delay(10000);
+    delay(5000);
     PortB.outtgl = 1 << 30;
 }
+
+# on_interrupt keyword auto-enables interrupt in NVIC
 on_interrupt RTCMode0 {
+    u32 curr_comp = 0;
+    u32 next_comp = 0;
+
     blinkLED();
+
+    curr_comp = RTCMode0.comp0;
+
+    if (going_faster == 1) {
+        next_comp = curr_comp - 0x200;
+    } else {
+        next_comp = curr_comp + 0x200;
+    }
+
+    if (next_comp == 0x4000) {
+        going_faster = 1;
+    }
+    if (next_comp == 0x1000) {
+        going_faster = 0;
+    }
+
+    RTCMode0.comp0 = next_comp;
+
+    # This clears the RTC peripheral interrupt flag
     RTCMode0.intflag = {
         comp0 = 1;
     };
+    # end of on_interrupt auto-clears interrupt in NVIC
 }

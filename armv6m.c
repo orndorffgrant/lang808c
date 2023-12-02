@@ -17,6 +17,7 @@
 #define C_ALWAYS 0b1110
 #define C_EQUALS 0b0000
 #define C_LESSTHAN 0b1011
+#define C_GREATERTHAN 0b1100
 
 #define ADDS_OPCODE 0b0001100
 #define ADDS_OPCODE_OFFSET 9
@@ -38,6 +39,8 @@
 #define LSLS_OPCODE_OFFSET 11
 #define LSLS_R_OPCODE 0b0100000010
 #define LSLS_R_OPCODE_OFFSET 6
+#define ASRS_R_OPCODE 0b0100000100
+#define ASRS_R_OPCODE_OFFSET 6
 #define ANDS_OPCODE 0b0100000000
 #define ANDS_OPCODE_OFFSET 6
 #define ORRS_OPCODE 0b0100001100
@@ -134,6 +137,11 @@ void lsls(int rd, int rm, int imm, MachineCodeFunction *code_func) {
 void lsls_r(int rdn, int rm, MachineCodeFunction *code_func) {
     ARMv6Op op = {0};
     op.code = (LSLS_R_OPCODE << LSLS_R_OPCODE_OFFSET) | (rm << 3) | (rdn);
+    add_armv6m_inst(op, code_func);
+}
+void asrs_r(int rdn, int rm, MachineCodeFunction *code_func) {
+    ARMv6Op op = {0};
+    op.code = (ASRS_R_OPCODE << ASRS_R_OPCODE_OFFSET) | (rm << 3) | (rdn);
     add_armv6m_inst(op, code_func);
 }
 void ands(int rd, int rm, MachineCodeFunction *code_func) {
@@ -453,6 +461,19 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
             rx_to_result(symbols, &ir_op->result, rd, code_func);
             break;
         }
+        case ir_shift_right: {
+            int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
+            int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
+            int rd = result_rx(&ir_op->result);
+            if (rd != rn) {
+                asrs_r(rn, rm, code_func);
+                mov_r(rd, rn, code_func);
+            } else {
+                asrs_r(rd, rm, code_func);
+            }
+            rx_to_result(symbols, &ir_op->result, rd, code_func);
+            break;
+        }
         case ir_bitwise_and: {
             int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
             int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
@@ -485,6 +506,16 @@ void ir_to_armv6m_inst(SymbolTable *symbols, IROp *ir_op, MachineCodeFunction *c
             cmp(rm, rn, code_func);
             // mrs(rd, 0, code_func);
             next_condition = C_LESSTHAN;
+            rx_to_result(symbols, &ir_op->result, rd, code_func);
+            break;
+        }
+        case ir_greater_than: {
+            int rn = arg_to_rX(symbols, &ir_op->arg1, R_ARG1, code_func);
+            int rm = arg_to_rX(symbols, &ir_op->arg2, R_ARG2_DEST, code_func);
+            int rd = result_rx(&ir_op->result);
+            cmp(rm, rn, code_func);
+            // mrs(rd, 0, code_func);
+            next_condition = C_GREATERTHAN;
             rx_to_result(symbols, &ir_op->result, rd, code_func);
             break;
         }
@@ -786,6 +817,13 @@ void print_op_machine_code(SymbolTable *symbols, ARMv6Op *op, int i) {
     } else if ((op->code >> LSLS_R_OPCODE_OFFSET) == LSLS_R_OPCODE) {
         printf(
             "LSLS R%d, R%d          ",
+            (op->code & 0b0000000000000111) >> 0,
+            (op->code & 0b0000000000111000) >> 3
+        );
+        printf("\t("); print_uint16_t_binary(op->code); printf(")\n");
+    } else if ((op->code >> ASRS_R_OPCODE_OFFSET) == ASRS_R_OPCODE) {
+        printf(
+            "ASRS R%d, R%d          ",
             (op->code & 0b0000000000000111) >> 0,
             (op->code & 0b0000000000111000) >> 3
         );

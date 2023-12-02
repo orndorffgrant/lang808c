@@ -244,7 +244,217 @@ MemoryMappedPeripheral RTCMode0 @0x40001400 !3 {
     comp0: u32;
 }
 
+# Here we define the PowerManager peripheral
+# You can find the register definitions in the datasheet for the SAMD21
+MemoryMappedPeripheral PowerManager @0x40000400 {
+    ctrla: u8;
+    sleep: u8;
+    $unused: u16;
+    $unused: u32;
+    cpusel: u8;
+    apbasel: u8;
+    apbbsel: u8;
+    apbcsel: u8;
+    $unused: u32;
+    $unused: u32;
+    ahbmask: u32;
+    apbamask: u32;
+    apbbmask: u32;
+    apbcmask: BitField32 {
+        pac2: 1;
+        evsys: 1;
+        sercom0: 1;
+        sercom1: 1;
+        sercom2: 1;
+        sercom3: 1;
+        sercom4: 1;
+        sercom5: 1;
+        tcc0: 1;
+        tcc1: 1;
+        tcc2: 1;
+        tc3: 1;
+        tc4: 1;
+        tc5: 1;
+        tc6: 1;
+        tc7: 1;
+        adc: 1;
+        ac: 1;
+        dac: 1;
+        ptc: 1;
+        i2s: 1;
+        ac1: 1;
+        $unused: 2;
+        tcc3: 1;
+        $unused: 7;
+    };
+}
+
+# Here we define the TCC0 peripheral
+# You can find the register definitions in the datasheet for the SAMD21
+MemoryMappedPeripheral TCC0 @0x42002000 {
+    ctrla: BitField32 {
+        swrst: 1;
+        enable: 1;
+        $unused: 3;
+        resolution: 2;
+        $unused: 1;
+        prescaler: 3;
+        runstdby: 1;
+        prescync: 2;
+        alock: 1;
+        $unused: 1;
+        $unused: 8;
+        cpten0: 1;
+        cpten1: 1;
+        cpten2: 1;
+        cpten3: 1;
+    };
+    ctrlbclr: BitField8 {
+        dir: 1;
+        lupd: 1;
+        oneshot: 1;
+        idxcmd: 2;
+        cmd: 3;
+    };
+    ctrlbset: BitField8 {
+        dir: 1;
+        lupd: 1;
+        oneshot: 1;
+        idxcmd: 2;
+        cmd: 3;
+    };
+    $unused: u16;
+    syncbusy: u32;
+    fctrla: u32;
+    fctrlb: u32;
+    wexctrl: u32;
+    drvctrl: u32;
+    $unused: u16;
+    dbgctrl: u8;
+    $unused: u8;
+    evctrl: u32;
+    intenclr: u32;
+    intenset: u32;
+    intflag: u32;
+    status: u32;
+    count: u32;
+    patt: u16;
+    $unused: u16;
+    wave: BitField32 {
+        wavegen: 3;
+        $unused: 1;
+        ramp: 2;
+        $unused: 1;
+        ciperen: 1;
+        ciccen0: 1;
+        ciccen1: 1;
+        ciccen2: 1;
+        ciccen3: 1;
+        $unused: 4;
+        pol0: 1;
+        pol1: 1;
+        pol2: 1;
+        pol3: 1;
+        $unused: 4;
+        swap0: 1;
+        swap1: 1;
+        swap2: 1;
+        swap3: 1;
+        $unused: 4;
+    };
+    per: BitField32 {
+        dither: 6;
+        per: 18;
+        $unused: 8;
+    };
+    cc0: BitField32 {
+        dither: 6;
+        cc: 18;
+        $unused: 8;
+    };
+    cc1: u32;
+    cc2: u32;
+    cc3: u32;
+    $unused: u32;
+    $unused: u32;
+    $unused: u32;
+    $unused: u32;
+    pattb: u16;
+    $unused: u16;
+    waveb: u32;
+    perb: u32;
+    ccb0: u32;
+    ccb1: u32;
+    ccb2: u32;
+    ccb3: u32;
+}
+
+# Here we define the initial values of the PowerManager registers
+# This turns on the peripheral clock for TCC0
+initialize PowerManager {
+    apbcmask = {
+        tcc0 = 1;
+    };
+}
+
 # Here we define the initial values of the PortB registers
+# This sets the dir bit of pin 30 so that we can use it as a PWM output with TCC0, which is Function E for PB30
+# Pin 30 is connected to the on-board LED
+initialize PortB {
+    outclr = 0x40000000; # 1 << 30
+    dir = 0x40000000; # 1 << 30
+    wrconfig = {
+        hwsel = 1;
+        pinmask = 0x4000;
+        wrpincfg = 1;
+        pmuxen = 1;
+        wrpmux = 1;
+        pmux = 0x4; # function E
+    };
+}
+
+# Here we define the initial values of the GCLK registers
+# Note that these will be set in order from top to bottom
+# This sets the internal 32khz clock to drive "GCLK 5"
+# Then this sets "GCLK 5" to drive the the TCC0 peripheral
+# You can find the directions for configuring this peripheral in the datasheet for the SAMD21
+initialize GCLK {
+    gendiv = {
+        id = 5;
+        div = 0;
+    };
+    genctrl = {
+        id = 5;
+        src = osculp32k;
+        genen = 1;
+    };
+    clkctrl = {
+        id = tcc0_tcc1;
+        gen = gclk5;
+        clken = 1;
+    };
+}
+
+# initialize TCC0/WO[0] to be a PWM output, that maps to PB30
+# need to enable CLK_TCC0_APB in power manager
+initialize TCC0 {
+    wave = {
+        wavegen = 0x2; # npwm
+    };
+    ctrla = {
+        enable = 1;
+    };
+    per = {
+        per = 4;
+    };
+    # cc0 controls the duty cycle
+    cc0 = {
+        cc = 0;
+    };
+    # might need to set prescaler?
+}
+
+# Here we define the initial values of the PortA registers
 # This sets the dir bit of pin 15 so that we can use it as input
 # Pin 15 is connected to the on-board switch
 initialize PortA {
@@ -257,14 +467,6 @@ initialize PortA {
         inen = 1;
         pullen = 1;
     };
-}
-
-# Here we define the initial values of the PortB registers
-# This sets the dir bit of pin 30 so that we can use it as output
-# Pin 30 is connected to the on-board LED
-initialize PortB {
-    dir = 0x40000000; # 1 << 30
-    outtgl = 0x40000000; # 1 << 30
 }
 
 # Here we define the initial values of the GCLK registers
@@ -291,13 +493,13 @@ initialize GCLK {
 
 # Here we define the initial values of the RTCMode0 registers
 # This sets it to be in "Count" mode and sets the interrupt to fire when the count
-# reaches 0x8000.
-# Since the we set a 32khz clock to drive the RTC, it will reach 0x8000 after 1 second.
+# reaches 0x80.
+# Since the we set a 32khz clock to drive the RTC, it will reach 0x80 256 times per second.
 # We set "matchclr" so that the count will go back to zero and continue counting after
-# it reaches 0x8000.
+# it reaches 0x80.
 initialize RTCMode0 {
     count = 0x0;
-    comp0 = 0x8000;
+    comp0 = 0x800;
     intenset = {
         comp0 = 1;
     };
@@ -309,68 +511,28 @@ initialize RTCMode0 {
 }
 
 # This defines a static variable, which is a global variable at a static location in memory
-# Here, the variable is called "counting_up" and initialized to 1.
-static u32 counting_up = 1;
-static u32 blink_times = 1;
-
-# This function just loops for a while to take up some time
-# The number of times it loops is passed via a function argument
-fun delay(delay_count: u32) {
-    u32 i = 0;
-    while (i < delay_count) {
-        i = i + 1;
-    }
-}
-
-# This function takes no arguments. It sets the toggle bit of pin 30
-# in PortB, which is the pin connected to the LED.
-# Then it uses the "delay" function to wait for a bit before toggling
-# the LED again.
-# The overall affect is that this function quickly flashes the LED on
-# and then off.
-fun blinkLED() {
-    PortB.outtgl = 1 << 30;
-    delay(5000);
-    PortB.outtgl = 1 << 30;
-}
-
-# This function calls "blinkLED" the number of times passed as the argument.
-# Then it calculates the number of times we should blink next time the RTC interrupt is called.
-fun blink_and_update_blink_times(blink_times: u32): u32 {
-    u32 new_blink_times = 0;
-
-    u32 i = 0;
-    while (i < blink_times) {
-        blinkLED();
-        delay(5000);
-        i = i + 1;
-    }
-
-    if (blink_times == 1) {
-        counting_up = 1;
-    }
-    if (blink_times == 4) {
-        counting_up = 0;
-    }
-    if (counting_up == 1) {
-        new_blink_times = blink_times + 1;
-    } else {
-        new_blink_times = blink_times - 1;
-    }
-
-    return new_blink_times;
-}
+static u32 pressed = 0;
 
 # on_interrupt keyword auto-enables interrupt in NVIC
 on_interrupt RTCMode0 {
+    u32 led_level = 0;
 
-    if (PortA.in & 1 << 15 == 0x8000) {
+    if (PortA.in & 0x8000 == 0x8000) {
         # if button is not pressed, reset state
-        blink_times = 1;
+        pressed = 0;
     } else {
-        # if button is pressed, blink the LED and update
-        # how many times we should update the LED for next interrupt
-        blink_times = blink_and_update_blink_times(blink_times);
+        if (pressed == 0) {
+            # if button is pressed and wasn't before
+            # update the led_level and set pressed
+            pressed = 1;
+            led_level = TCC0.cc0 >> 6;
+            if (led_level == 5) {
+                led_level = 1;
+            } else {
+                led_level = led_level + 1;
+            }
+            TCC0.cc0 = led_level << 6;
+        }
     }
 
     # This clears the RTC peripheral interrupt flag
